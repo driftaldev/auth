@@ -161,5 +161,259 @@
       "tags": []
     },
     "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "4ce19fc9-9e79-4282-8ab9-8529cb98369e",
+    "timestamp": 1762540313865,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Inconsistent error handling in optionalAuth middleware",
+      "description": "In the optionalAuth middleware, if the token verification fails due to an error or if the user is not found, the middleware silently continues without logging the error or informing the user.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 128
+      },
+      "problematicPath": "If there is an error during token verification or the user is not found, the middleware proceeds without any action.",
+      "edgeCases": [
+        "Invalid token",
+        "Expired token",
+        "User not found in database"
+      ],
+      "suggestion": {
+        "description": "Add error logging and handle the case where the user is not found or the token is invalid.",
+        "code": "if (error) {\n  logger.warn('Token verification failed in optionalAuth', { error: error.message });\n  return next();\n}\nif (!user) {\n  logger.warn('User not found in optionalAuth', { token });\n  return next();\n}"
+      },
+      "rationale": "Ignoring errors or missing user data can lead to unauthorized access or unhandled behavior later in the request processing pipeline.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "d7671839-78fc-470a-99ab-d9f5880d35a0",
+    "timestamp": 1762540313865,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficiency in token verification logic",
+      "description": "The middleware repeatedly checks the format of the authorization header and parses the token in each function.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 25
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Refactor the token extraction and format validation into a separate reusable function to avoid code duplication and potential errors.",
+        "code": "function extractToken(authHeader: string): string {\n  if (!authHeader) {\n    throw new AuthenticationError('No authorization header provided');\n  }\n  if (!authHeader.startsWith('Bearer ')) {\n    throw new AuthenticationError('Invalid authorization header format. Expected: Bearer <token>');\n  }\n  return authHeader.substring(7);\n}"
+      },
+      "alternative": "Implement a utility function for handling token extraction and validation",
+      "rationale": "Improving code reusability and maintainability by centralizing the token handling logic",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "4d49a8f7-f52c-410a-9908-3d2cae8edd56",
+    "timestamp": 1762540313865,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Redundant user object checks",
+      "description": "The code redundantly checks for user object existence after token verification, which is already handled by throwing exceptions on errors.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 60
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove redundant user existence checks after error handling in the token verification logic.",
+        "code": "// After verifying token\nif (error) {\n  logger.warn('Token verification failed', { error: error.message });\n  throw new AuthenticationError('Invalid or expired token');\n}\n// Attach user to request\nreq.user = {\n  id: user.id,\n  email: user.email\n};\nreq.userId = user.id;"
+      },
+      "alternative": "Streamline error handling and user assignment",
+      "rationale": "Eliminates unnecessary conditions and simplifies the code flow",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "48f6593b-4d02-4f5b-b5b4-a718ac96a4bc",
+    "timestamp": 1762540313865,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No handling for undefined 'user' object after token verification",
+      "description": "After token verification, if the 'user' object is undefined, the code attempts to destructure it which can lead to runtime errors.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 71
+      },
+      "problematicPath": "Destructuring 'user' when it might be undefined after a failed token verification.",
+      "edgeCases": [
+        "Token verification fails but does not throw an error"
+      ],
+      "suggestion": {
+        "description": "Check if 'user' is not undefined before accessing its properties.",
+        "code": "if (user) {\n  req.user = {\n    id: user.id,\n    email: user.email,\n  };\n  req.userId = user.id;\n  logger.debug('Token verified successfully', { userId: user.id });\n  next();\n} else {\n  throw new AuthenticationError('User data not available after token verification');\n}"
+      },
+      "rationale": "Accessing properties on an undefined object will cause a TypeError, potentially crashing the server or middleware.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "f6871fcb-fa7a-473c-ad4c-0fa5302a2c74",
+    "timestamp": 1762540313865,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Development token format not rigorously checked",
+      "description": "The check for development token format assumes a specific structure without validating the presence of all expected parts, which could lead to incorrect user identification.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 39
+      },
+      "problematicPath": "Assuming 'supabase_jwt_' prefix guarantees a valid token structure.",
+      "edgeCases": [
+        "Token with 'supabase_jwt_' prefix but incorrect subsequent parts"
+      ],
+      "suggestion": {
+        "description": "Add checks to ensure all parts of the development token are present and valid.",
+        "code": "if (parts.length < 4 || !parts[2]) {\n  throw new AuthenticationError('Invalid development token format');\n}"
+      },
+      "rationale": "Assuming token structure without validation can lead to security flaws or application errors.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "e0d5704a-324e-4102-9c51-ad52274d2de1",
+    "timestamp": 1762540680160,
+    "fileName": "src/services/proxy.ts",
+    "fileHash": "a773c6fb4fef81721edcb6eeecb5e7cb",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Unhandled promise rejection in getUserModel",
+      "description": "The function getUserModel does not handle the case where the database operation might fail due to reasons other than a missing profile.",
+      "location": {
+        "file": "src/services/proxy.ts",
+        "line": 34
+      },
+      "problematicPath": "If prisma.userProfile.findUnique throws an error other than 'profile not found', it is caught and logged, but the function still returns a default model without indicating an error occurred.",
+      "edgeCases": [
+        "Database connection issues",
+        "Prisma internal errors"
+      ],
+      "suggestion": {
+        "description": "Rethrow the error after logging to ensure that calling functions can handle it or fail gracefully.",
+        "code": "catch (error) {\n  logger.error('Error getting user model', { userId, error });\n  throw error;\n}"
+      },
+      "rationale": "Silently catching errors and returning a default value can mask underlying issues and lead to unexpected behavior in production.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "9e87e21f-ba53-4910-9746-7d0771633562",
+    "timestamp": 1762540680160,
+    "fileName": "src/services/proxy.ts",
+    "fileHash": "a773c6fb4fef81721edcb6eeecb5e7cb",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Inconsistent error handling in routeLLMRequest and routeLLMStreamRequest",
+      "description": "Error handling in routeLLMRequest and routeLLMStreamRequest logs and rethrows errors differently, leading to potential inconsistencies in how errors are processed in these similar functions.",
+      "location": {
+        "file": "src/services/proxy.ts",
+        "line": 71,
+        "endLine": 130
+      },
+      "problematicPath": "routeLLMRequest uses a catch block to log and rethrow errors, while routeLLMStreamRequest does not explicitly rethrow errors.",
+      "edgeCases": [
+        "Unhandled exceptions in provider functions"
+      ],
+      "suggestion": {
+        "description": "Standardize error handling in both functions to ensure consistency. Consider using a shared error handling function.",
+        "code": "function handleError(error, userId, model, provider, startTime) {\n  const duration = Date.now() - startTime;\n  logUsage(userId, model, provider, null, duration, 'error', error.message);\n  throw error;\n}"
+      },
+      "rationale": "Consistent error handling across similar functions reduces the risk of bugs and makes the code easier to maintain.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "aa17dcf9-c8c6-4895-8588-f526df12c35b",
+    "timestamp": 1762540680160,
+    "fileName": "src/services/proxy.ts",
+    "fileHash": "a773c6fb4fef81721edcb6eeecb5e7cb",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential null reference in logUsage",
+      "description": "The logUsage function does not handle null values for the 'usage' parameter gracefully when calculating token counts.",
+      "location": {
+        "file": "src/services/proxy.ts",
+        "line": 192
+      },
+      "problematicPath": "If 'usage' is null, accessing properties like usage.prompt_tokens will throw a TypeError.",
+      "edgeCases": [
+        "Usage data not available or not applicable"
+      ],
+      "suggestion": {
+        "description": "Check for null before accessing properties on the 'usage' object.",
+        "code": "promptTokens: usage ? usage.prompt_tokens : null,\ncompletionTokens: usage ? usage.completion_tokens : null,\ntotalTokens: usage ? usage.total_tokens : null,"
+      },
+      "rationale": "Preventing type errors by checking for null values ensures that the function can handle cases where usage data is not applicable.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "fa4e0daf-4205-4540-acbf-1d7135264c06",
+    "timestamp": 1762540680160,
+    "fileName": "src/services/proxy.ts",
+    "fileHash": "a773c6fb4fef81721edcb6eeecb5e7cb",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Redundant validation checks in validateChatCompletionRequest",
+      "description": "The function validateChatCompletionRequest checks if 'request.messages' is an array and non-empty, but does not handle the case where 'request' itself might be null or undefined.",
+      "location": {
+        "file": "src/services/proxy.ts",
+        "line": 250
+      },
+      "problematicPath": "If 'request' is null, accessing request.messages will throw a TypeError.",
+      "edgeCases": [
+        "Null or undefined request object"
+      ],
+      "suggestion": {
+        "description": "Add a check to ensure 'request' is not null or undefined before accessing its properties.",
+        "code": "if (!request) {\n  throw new ValidationError('Request object is required');\n}"
+      },
+      "rationale": "Ensuring that the function can handle null or undefined inputs prevents runtime errors and makes the API more robust.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
   }
 ]
