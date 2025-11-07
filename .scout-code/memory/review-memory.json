@@ -1,0 +1,165 @@
+[
+  {
+    "id": "788d5061-c46a-4f8d-ad54-92211a5a1bf0",
+    "timestamp": 1762499684697,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Inconsistent error handling in optionalAuth middleware",
+      "description": "In the optionalAuth middleware, if the token verification fails due to an error or if no user is found, the middleware silently continues without logging or handling the error.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 126
+      },
+      "problematicPath": "When error is not null or user is null, the middleware proceeds without any action.",
+      "edgeCases": [
+        "Invalid token",
+        "Expired token",
+        "User not found in database"
+      ],
+      "suggestion": {
+        "description": "Add error logging and handling for failed token verification in optionalAuth",
+        "code": "if (error) {\n  logger.warn('Token verification failed in optionalAuth', { error: error.message });\n  return next();\n}\nif (!user) {\n  logger.warn('User not found in optionalAuth');\n  return next();\n}"
+      },
+      "rationale": "Ignoring errors can lead to untracked issues and make debugging difficult. Proper logging and error handling are essential for maintaining the integrity and traceability of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "7be5ef64-3bbe-4e0a-a161-9ca12774c3c5",
+    "timestamp": 1762499684697,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Insecure handling of development tokens",
+      "description": "Development tokens are accepted without proper validation, which could allow unauthorized access in a production environment if not properly managed.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 37
+      },
+      "cwe": "CWE-284",
+      "suggestion": {
+        "description": "Ensure development tokens are only accepted in a development environment and implement strict validation.",
+        "code": "if (process.env.NODE_ENV === 'development' && token.startsWith('supabase_jwt_')) { /* token handling */ }"
+      },
+      "rationale": "Accepting development tokens without strict environment checks and validation can lead to unauthorized access if these tokens are mishandled or used inappropriately in production environments.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "6ac16ef3-de75-4baa-bba3-193ebc01025d",
+    "timestamp": 1762499684697,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Lack of role-based access control for admin operations",
+      "description": "The middleware 'requireAdmin' does not actually verify if the authenticated user has admin privileges, which could lead to unauthorized administrative access.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 183
+      },
+      "cwe": "CWE-285",
+      "suggestion": {
+        "description": "Implement role checks by querying user roles from the database or another reliable source to ensure only users with admin roles can perform administrative operations.",
+        "code": "if (userRole !== 'admin') { throw new AuthenticationError('Admin role required'); }"
+      },
+      "rationale": "Without proper role checks, any authenticated user could potentially perform administrative actions, which should be restricted to users with the appropriate roles.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "53227427-c99a-448a-a94c-b740248e8610",
+    "timestamp": 1762499684697,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Unnecessary async declaration in requireAdmin middleware",
+      "description": "The requireAdmin middleware is declared as async but does not perform any asynchronous operations, which is misleading and unnecessary.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 170
+      },
+      "problematicPath": "The function is declared with async but contains no await statements.",
+      "edgeCases": [
+        "General usage of requireAdmin middleware"
+      ],
+      "suggestion": {
+        "description": "Remove the async keyword from the requireAdmin function declaration",
+        "code": "export function requireAdmin(req: Request, res: Response, next: NextFunction): void { ... }"
+      },
+      "rationale": "Using async unnecessarily can lead to confusion about the function's behavior and slight overhead in runtime due to the Promise handling.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "af9e902c-b057-4403-bb43-3c1364fd43d7",
+    "timestamp": 1762499684697,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Error handling does not differentiate between types of errors",
+      "description": "In the catch blocks of the middleware functions, there is no differentiation between different types of errors, which could lead to inappropriate HTTP status codes and error messages being returned.",
+      "location": {
+        "file": "src/middleware/auth.ts",
+        "line": 91
+      },
+      "problematicPath": "All errors are treated the same, potentially leading to incorrect error responses.",
+      "edgeCases": [
+        "Network errors",
+        "Database errors",
+        "Unexpected exceptions"
+      ],
+      "suggestion": {
+        "description": "Implement error type checking and handle different types of errors appropriately",
+        "code": "if (error instanceof AuthenticationError) {\n  res.status(error.statusCode).json({ error: error.message, code: error.code });\n} else if (error instanceof NetworkError) {\n  res.status(503).json({ error: 'Service unavailable', code: 'SERVICE_UNAVAILABLE' });\n} else {\n  res.status(500).json({ error: 'Internal server error', code: 'SERVER_ERROR' });\n}"
+      },
+      "rationale": "Different types of errors should be handled according to their nature to provide accurate feedback to the client and to aid in debugging.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  },
+  {
+    "id": "a85022ec-20b1-48cb-b727-7d7ae23a4e5e",
+    "timestamp": 1762499684697,
+    "fileName": "src/middleware/auth.ts",
+    "fileHash": "66ee3235d18087b9bb0ed2090d1890be",
+    "issue": {
+      "type": "security",
+      "severity": "low",
+      "title": "Potential exposure of sensitive configuration data",
+      "description": "The route '/config' exposes sensitive configuration details such as Supabase URL and anonymous key, which should not be publicly accessible.",
+      "location": {
+        "file": "src/routes/auth.ts",
+        "line": 2
+      },
+      "cwe": "CWE-200",
+      "suggestion": {
+        "description": "Restrict access to the configuration route or remove sensitive data from the response.",
+        "code": "res.json({ message: 'Config data is not publicly accessible' });"
+      },
+      "rationale": "Exposing sensitive configuration details can provide attackers with information that could be used to exploit the system or gain unauthorized access.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/backend"
+  }
+]

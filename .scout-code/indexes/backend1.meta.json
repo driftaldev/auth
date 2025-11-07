@@ -1,0 +1,140 @@
+{
+  "repo_full_name": "backend1",
+  "files": {
+    "src/middleware/error.ts": {
+      "hash": "1c21097c43a7d0bffd70384065c467b4",
+      "chunks": [
+        "src/middleware/error.ts::chunk-0",
+        "src/middleware/error.ts::chunk-1",
+        "src/middleware/error.ts::chunk-2"
+      ]
+    },
+    "src/middleware/rate-limit.ts": {
+      "hash": "8a33e1ea3196a9e690308ad4469dc79a",
+      "chunks": [
+        "src/middleware/rate-limit.ts::chunk-0",
+        "src/middleware/rate-limit.ts::chunk-1",
+        "src/middleware/rate-limit.ts::chunk-2"
+      ]
+    },
+    "src/middleware/auth.ts": {
+      "hash": "317dbc7a967aac39cf68eb4bb87c9884",
+      "chunks": [
+        "src/middleware/auth.ts::chunk-0",
+        "src/middleware/auth.ts::chunk-1",
+        "src/middleware/auth.ts::chunk-2"
+      ]
+    },
+    "src/types/index.ts": {
+      "hash": "22bb0173081be13d94a2dbb53f6abd52",
+      "chunks": [
+        "src/types/index.ts::chunk-0",
+        "src/types/index.ts::chunk-1",
+        "src/types/index.ts::chunk-2",
+        "src/types/index.ts::chunk-3"
+      ]
+    },
+    "src/config/logger.ts": {
+      "hash": "f6703e61d9d21454e568895e5d6954ca",
+      "chunks": [
+        "src/config/logger.ts::chunk-0",
+        "src/config/logger.ts::chunk-1"
+      ]
+    },
+    "src/config/index.ts": {
+      "hash": "de384e85ba5f7098ac3273126ff6ffa5",
+      "chunks": [
+        "src/config/index.ts::chunk-0",
+        "src/config/index.ts::chunk-1",
+        "src/config/index.ts::chunk-2"
+      ]
+    },
+    "src/index.ts": {
+      "hash": "78efc40a183826ce0b522b1ff92f366f",
+      "chunks": [
+        "src/index.ts::chunk-0",
+        "src/index.ts::chunk-1",
+        "src/index.ts::chunk-2"
+      ]
+    },
+    "src/routes/proxy.ts": {
+      "hash": "e4de36ac568191a8e6d45fbe306fdff3",
+      "chunks": [
+        "src/routes/proxy.ts::chunk-0",
+        "src/routes/proxy.ts::chunk-1",
+        "src/routes/proxy.ts::chunk-2"
+      ]
+    },
+    "src/routes/health.ts": {
+      "hash": "97721b9c4370d7453dcec7e40fdbcc2a",
+      "chunks": [
+        "src/routes/health.ts::chunk-0",
+        "src/routes/health.ts::chunk-1"
+      ]
+    },
+    "src/routes/auth.ts": {
+      "hash": "64e6f53b80f4252f380a382e8f036d78",
+      "chunks": [
+        "src/routes/auth.ts::chunk-0",
+        "src/routes/auth.ts::chunk-1",
+        "src/routes/auth.ts::chunk-2",
+        "src/routes/auth.ts::chunk-3"
+      ]
+    },
+    "src/services/prisma.ts": {
+      "hash": "a2eae045740f770cd1532b0f5e3784a8",
+      "chunks": [
+        "src/services/prisma.ts::chunk-0",
+        "src/services/prisma.ts::chunk-1"
+      ]
+    },
+    "src/services/anthropic.ts": {
+      "hash": "dd474c6977d5bfe889d53e12b4ad6cc0",
+      "chunks": [
+        "src/services/anthropic.ts::chunk-0",
+        "src/services/anthropic.ts::chunk-1",
+        "src/services/anthropic.ts::chunk-2",
+        "src/services/anthropic.ts::chunk-3"
+      ]
+    },
+    "src/services/openai.ts": {
+      "hash": "e8100b4ece242f047889b4a176344630",
+      "chunks": [
+        "src/services/openai.ts::chunk-0",
+        "src/services/openai.ts::chunk-1",
+        "src/services/openai.ts::chunk-2"
+      ]
+    },
+    "src/services/proxy.ts": {
+      "hash": "5b8714d505da73650fb2d1b433d13812",
+      "chunks": [
+        "src/services/proxy.ts::chunk-0",
+        "src/services/proxy.ts::chunk-1",
+        "src/services/proxy.ts::chunk-2",
+        "src/services/proxy.ts::chunk-3",
+        "src/services/proxy.ts::chunk-4"
+      ]
+    },
+    "src/services/supabase.ts": {
+      "hash": "1c0d8f8dafb9efcc1824f4d3c3115eae",
+      "chunks": [
+        "src/services/supabase.ts::chunk-0",
+        "src/services/supabase.ts::chunk-1",
+        "src/services/supabase.ts::chunk-2"
+      ]
+    },
+    "src/services/auth.ts": {
+      "hash": "1b5542abdf0d1a087d8f35347db27f1e",
+      "chunks": [
+        "src/services/auth.ts::chunk-0",
+        "src/services/auth.ts::chunk-1",
+        "src/services/auth.ts::chunk-2",
+        "src/services/auth.ts::chunk-3",
+        "src/services/auth.ts::chunk-4",
+        "src/services/auth.ts::chunk-5"
+      ]
+    }
+  },
+  "created_at": "2025-11-07T07:10:59.422Z",
+  "updated_at": "2025-11-07T07:10:59.422Z"
+}

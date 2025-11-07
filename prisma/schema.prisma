@@ -1,0 +1,98 @@
+// Prisma schema for ScoutCLI Backend
+// Uses Supabase PostgreSQL database
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User Profiles
+// ============================================================================
+
+/// User profiles extending Supabase auth.users
+/// Stores model preferences for ScoutCLI
+model UserProfile {
+  id             String   @id @db.Uuid // References auth.users(id)
+  primaryModel   String   @default("claude-3-5-sonnet-20241022") @map("primary_model") @db.VarChar(100)
+  fallbackModel  String?  @map("fallback_model") @db.VarChar(100)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  authCodes      AuthCode[]
+  usageLogs      UsageLog[]
+
+  @@map("user_profiles")
+}
+
+// ============================================================================
+// Authorization Codes
+// ============================================================================
+
+/// OAuth authorization codes for CLI authentication flow
+/// Short-lived codes (10 minutes) for token exchange
+model AuthCode {
+  code       String   @id @db.VarChar(255)
+  userId     String   @map("user_id") @db.Uuid
+  state      String   @db.VarChar(255) // CSRF protection
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  used       Boolean  @default(false)
+  usedAt     DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([used])
+  @@index([state])
+  @@map("auth_codes")
+}
+
+// ============================================================================
+// Usage Logs
+// ============================================================================
+
+/// LLM API usage logs for analytics and monitoring
+/// Tracks all requests to Anthropic/OpenAI
+model UsageLog {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  model              String   @db.VarChar(100)
+  provider           String   @db.VarChar(50) // 'anthropic' or 'openai'
+  promptTokens       Int?     @map("prompt_tokens")
+  completionTokens   Int?     @map("completion_tokens")
+  totalTokens        Int?     @map("total_tokens")
+  requestDurationMs  Int?     @map("request_duration_ms")
+  status             Status   @default(success)
+  errorMessage       String?  @map("error_message") @db.Text
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  user               UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([model])
+  @@index([provider])
+  @@index([status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("usage_logs")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum Status {
+  success
+  error
+  rate_limited
+}

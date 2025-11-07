@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScoutCLI Authentication</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 480px;
+        width: 100%;
+        padding: 40px;
+      }
+
+      .logo {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .logo h1 {
+        color: #667eea;
+        font-size: 32px;
+        margin-bottom: 8px;
+      }
+
+      .logo p {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .auth-form {
+        margin-bottom: 30px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      input,
+      select {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .button {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+      }
+
+      .button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .toggle-link {
+        text-align: center;
+        margin-top: 15px;
+        color: #667eea;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .toggle-link:hover {
+        text-decoration: underline;
+      }
+
+      .error {
+        background: #fee;
+        color: #c33;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .success {
+        background: #efe;
+        color: #3c3;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .loading {
+        text-align: center;
+        color: #667eea;
+        font-size: 18px;
+        padding: 20px;
+        display: none;
+      }
+
+      .model-selection {
+        display: none;
+      }
+
+      .model-info {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+      }
+
+      .divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        margin: 20px 0;
+      }
+
+      .divider::before,
+      .divider::after {
+        content: "";
+        flex: 1;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .divider span {
+        padding: 0 10px;
+        color: #999;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo">
+        <h1>ScoutCLI</h1>
+        <p>Authenticate to continue</p>
+      </div>
+
+      <div class="error" id="error"></div>
+      <div class="success" id="success"></div>
+      <div class="loading" id="loading">Authenticating...</div>
+
+      <div class="auth-form" id="authForm">
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              placeholder="you@example.com"
+            />
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              placeholder="••••••••"
+            />
+          </div>
+          <button type="submit" class="button" id="submitBtn">Sign In</button>
+        </form>
+        <div class="toggle-link" id="toggleForm">
+          Don't have an account? <strong>Sign Up</strong>
+        </div>
+      </div>
+
+      <div class="model-selection" id="modelSelection">
+        <h3 style="margin-bottom: 20px; color: #333">Select Your Models</h3>
+        <div class="form-group">
+          <label for="primaryModel">Primary Model</label>
+          <select id="primaryModel">
+            <option value="claude-3-5-sonnet-20241022">
+              Claude 3.5 Sonnet (Recommended)
+            </option>
+            <option value="claude-3-5-haiku-20241022">
+              Claude 3.5 Haiku (Fast)
+            </option>
+            <option value="claude-3-opus-20240229">
+              Claude 3 Opus (Powerful)
+            </option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-4">GPT-4</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          </select>
+          <div class="model-info">Your default model for code reviews</div>
+        </div>
+        <div class="form-group">
+          <label for="fallbackModel">Fallback Model (Optional)</label>
+          <select id="fallbackModel">
+            <option value="">None</option>
+            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+            <option value="gpt-4">GPT-4</option>
+          </select>
+          <div class="model-info">Used if primary model fails</div>
+        </div>
+        <button class="button" id="authorizeBtn">Authorize ScoutCLI</button>
+      </div>
+    </div>
+
+    <script>
+      // Get query parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const state = urlParams.get("state");
+      const primaryModelParam = urlParams.get("primary_model");
+      const fallbackModelParam = urlParams.get("fallback_model");
+      const callbackPortParam = urlParams.get("callback_port");
+
+      if (callbackPortParam) {
+        localStorage.setItem("scoutcli_callback_port", callbackPortParam);
+      }
+
+      // DOM elements
+      const authForm = document.getElementById("authForm");
+      const modelSelection = document.getElementById("modelSelection");
+      const loginForm = document.getElementById("loginForm");
+      const toggleForm = document.getElementById("toggleForm");
+      const submitBtn = document.getElementById("submitBtn");
+      const authorizeBtn = document.getElementById("authorizeBtn");
+      const errorDiv = document.getElementById("error");
+      const successDiv = document.getElementById("success");
+      const loadingDiv = document.getElementById("loading");
+
+      let supabaseClient = null;
+      let isSignUp = false;
+      let currentUser = null;
+
+      // Prepare UI until configuration loads
+      authForm.style.display = "none";
+      modelSelection.style.display = "none";
+      submitBtn.disabled = true;
+      authorizeBtn.disabled = true;
+      showLoading("Loading authentication configuration...");
+
+      initializeSupabase();
+
+      // Pre-fill model selections if provided
+      if (primaryModelParam) {
+        document.getElementById("primaryModel").value = primaryModelParam;
+      }
+      if (fallbackModelParam) {
+        document.getElementById("fallbackModel").value = fallbackModelParam;
+      }
+
+      async function initializeSupabase() {
+        try {
+          const response = await fetch("/auth/config", { cache: "no-store" });
+
+          if (!response.ok) {
+            throw new Error("Failed to load authentication configuration");
+          }
+
+          const { supabaseUrl, supabaseAnonKey } = await response.json();
+
+          if (!supabaseUrl || !supabaseAnonKey) {
+            throw new Error("Authentication configuration is incomplete");
+          }
+
+          const supabaseLibrary = window.supabase;
+
+          if (
+            !supabaseLibrary ||
+            typeof supabaseLibrary.createClient !== "function"
+          ) {
+            throw new Error("Supabase SDK failed to load");
+          }
+
+          supabaseClient = supabaseLibrary.createClient(
+            supabaseUrl,
+            supabaseAnonKey
+          );
+
+          submitBtn.disabled = false;
+          authorizeBtn.disabled = false;
+          authForm.style.display = "block";
+          modelSelection.style.display = "none";
+          errorDiv.style.display = "none";
+          successDiv.style.display = "none";
+          loadingDiv.style.display = "none";
+          loadingDiv.textContent = "Authenticating...";
+        } catch (error) {
+          console.error(
+            "Failed to initialize authentication configuration",
+            error
+          );
+          showError(
+            "Failed to load authentication configuration. Please refresh the page."
+          );
+          loadingDiv.style.display = "none";
+        }
+      }
+
+      // Toggle between sign in and sign up
+      toggleForm.addEventListener("click", () => {
+        isSignUp = !isSignUp;
+        submitBtn.textContent = isSignUp ? "Sign Up" : "Sign In";
+        toggleForm.innerHTML = isSignUp
+          ? "Already have an account? <strong>Sign In</strong>"
+          : "Don't have an account? <strong>Sign Up</strong>";
+      });
+
+      // Handle form submission
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearMessages();
+
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = isSignUp
+          ? "Creating account..."
+          : "Signing in...";
+
+        try {
+          if (!supabaseClient) {
+            throw new Error(
+              "Authentication configuration not loaded. Please refresh the page."
+            );
+          }
+
+          let result;
+          if (isSignUp) {
+            result = await supabaseClient.auth.signUp({ email, password });
+          } else {
+            result = await supabaseClient.auth.signInWithPassword({
+              email,
+              password,
+            });
+          }
+
+          if (result.error) {
+            throw result.error;
+          }
+
+          currentUser = result.data.user;
+
+          if (isSignUp && !result.data.session) {
+            showSuccess("Check your email for confirmation link!");
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Sign Up";
+            return;
+          }
+
+          showSuccess(
+            isSignUp ? "Account created!" : "Signed in successfully!"
+          );
+
+          // Show model selection
+          authForm.style.display = "none";
+          modelSelection.style.display = "block";
+        } catch (error) {
+          showError(error.message || "Authentication failed");
+          submitBtn.disabled = false;
+          submitBtn.textContent = isSignUp ? "Sign Up" : "Sign In";
+        }
+      });
+
+      // Handle authorization
+      authorizeBtn.addEventListener("click", async () => {
+        if (!currentUser) {
+          showError("No user session found");
+          return;
+        }
+
+        authorizeBtn.disabled = true;
+        authorizeBtn.textContent = "Authorizing...";
+
+        try {
+          const primaryModel = document.getElementById("primaryModel").value;
+          const fallbackModel =
+            document.getElementById("fallbackModel").value || null;
+
+          // Generate authorization code
+          const response = await fetch("/auth/code", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_id: currentUser.id,
+              state: state,
+              primary_model: primaryModel,
+              fallback_model: fallbackModel,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(
+              error.error || "Failed to generate authorization code"
+            );
+          }
+
+          const data = await response.json();
+
+          // Redirect back to CLI
+          const callbackUrl = `http://localhost:${getCallbackPort()}/callback?code=${
+            data.code
+          }&state=${state}`;
+          showSuccess("Authorization successful! Redirecting...");
+
+          setTimeout(() => {
+            window.location.href = callbackUrl;
+          }, 1500);
+        } catch (error) {
+          showError(error.message || "Authorization failed");
+          authorizeBtn.disabled = false;
+          authorizeBtn.textContent = "Authorize ScoutCLI";
+        }
+      });
+
+      // Helper functions
+      function showLoading(message) {
+        loadingDiv.textContent = message;
+        loadingDiv.style.display = "block";
+        errorDiv.style.display = "none";
+        successDiv.style.display = "none";
+      }
+
+      function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = "block";
+        successDiv.style.display = "none";
+      }
+
+      function showSuccess(message) {
+        successDiv.textContent = message;
+        successDiv.style.display = "block";
+        errorDiv.style.display = "none";
+      }
+
+      function clearMessages() {
+        errorDiv.style.display = "none";
+        successDiv.style.display = "none";
+        loadingDiv.style.display = "none";
+      }
+
+      // Get random port from localStorage or generate one
+      function getCallbackPort() {
+        if (callbackPortParam) return callbackPortParam;
+
+        const stored = localStorage.getItem("scoutcli_callback_port");
+        if (stored) return stored;
+
+        // Port should be passed from CLI, default to 3333
+        return "3333";
+      }
+
+      // Check if state parameter is present
+      if (!state) {
+        showError("Invalid authentication request. Missing state parameter.");
+      }
+    </script>
+  </body>
+</html>
