@@ -29,6 +29,13 @@ const configSchema = z.object({
   // LLM Providers
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
 
+  // Moss (Semantic Code Search)
+  MOSS_PROJECT_ID: z.string().min(1, "MOSS_PROJECT_ID is required"),
+  MOSS_PROJECT_KEY: z.string().min(1, "MOSS_PROJECT_KEY is required"),
+
+  // Morph (Fast Apply)
+  MORPH_API_KEY: z.string().optional(),
+
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.string().default("60000").transform(Number),
   RATE_LIMIT_MAX_REQUESTS: z.string().default("50").transform(Number),
@@ -75,8 +82,10 @@ function loadConfig(): Config {
       supabaseServiceRoleKey: parsed.SUPABASE_SERVICE_ROLE_KEY,
       supabaseJwtSecret: parsed.SUPABASE_JWT_SECRET,
       redisUrl: parsed.REDIS_URL,
-      anthropicApiKey: parsed.ANTHROPIC_API_KEY,
       openaiApiKey: parsed.OPENAI_API_KEY,
+      mossProjectId: parsed.MOSS_PROJECT_ID,
+      mossProjectKey: parsed.MOSS_PROJECT_KEY,
+      morphApiKey: parsed.MORPH_API_KEY,
       rateLimitWindowMs: parsed.RATE_LIMIT_WINDOW_MS,
       rateLimitMaxRequests: parsed.RATE_LIMIT_MAX_REQUESTS,
       allowedOrigins: parsed.ALLOWED_ORIGINS,

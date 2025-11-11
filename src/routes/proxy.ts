@@ -1,17 +1,18 @@
 // LLM proxy routes
 
-import { Router, Request, Response } from 'express';
-import { asyncHandler } from '../middleware/error.js';
-import { verifyToken } from '../middleware/auth.js';
-import { llmRateLimiter } from '../middleware/rate-limit.js';
+import { Router, Request, Response } from "express";
+import { asyncHandler } from "../middleware/error.js";
+import { verifyToken } from "../middleware/auth.js";
+import { llmRateLimiter } from "../middleware/rate-limit.js";
 import {
   routeLLMRequest,
   routeLLMStreamRequest,
   validateChatCompletionRequest,
   getUserUsageStats,
-} from '../services/proxy.js';
-import { logger } from '../config/logger.js';
-import { ChatCompletionChunk } from '../types/index.js';
+} from "../services/proxy.js";
+import { logger } from "../config/logger.js";
+import { config } from "../config/index.js";
+import { ChatCompletionChunk } from "../types/index.js";
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.use(verifyToken);
  *   Server-Sent Events (SSE) stream with data chunks
  */
 router.post(
-  '/v1/chat/completions',
+  "/v1/chat/completions",
   llmRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.userId!;
@@ -72,18 +73,18 @@ router.post(
     const chatRequest = req.body;
     const isStreaming = chatRequest.stream === true;
 
-    logger.info('Chat completion request', {
+    logger.info("Chat completion request", {
       userId,
-      model: chatRequest.model || 'default',
+      model: chatRequest.model || "default",
       streaming: isStreaming,
       messageCount: chatRequest.messages.length,
     });
 
     if (isStreaming) {
       // Handle streaming response with Server-Sent Events
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
       res.flushHeaders();
 
       try {
@@ -95,14 +96,13 @@ router.post(
         }
 
         // Send done signal
-        res.write('data: [DONE]\n\n');
+        res.write("data: [DONE]\n\n");
         res.end();
       } catch (error) {
         // Send error as SSE
         res.write(
           `data: ${JSON.stringify({
-            error:
-              error instanceof Error ? error.message : 'Unknown error',
+            error: error instanceof Error ? error.message : "Unknown error",
           })}\n\n`
         );
         res.end();
@@ -136,12 +136,12 @@ router.post(
  *   }
  */
 router.get(
-  '/v1/usage',
+  "/v1/usage",
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.userId!;
     const days = parseInt(req.query.days as string) || 30;
 
-    logger.info('Usage stats request', { userId, days });
+    logger.info("Usage stats request", { userId, days });
 
     const stats = await getUserUsageStats(userId, days);
 
@@ -181,14 +181,14 @@ router.get(
  *   }
  */
 router.get(
-  '/v1/models',
+  "/v1/models",
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.userId!;
 
-    logger.debug('Models list request', { userId });
+    logger.debug("Models list request", { userId });
 
     // Import SUPPORTED_MODELS from types
-    const { SUPPORTED_MODELS } = await import('../types/index.js');
+    const { SUPPORTED_MODELS } = await import("../types/index.js");
 
     const models = Object.entries(SUPPORTED_MODELS).map(([id, info]) => ({
       id,
@@ -198,6 +198,71 @@ router.get(
     }));
 
     res.json({ models });
+  })
+);
+
+/**
+ * GET /v1/moss/credentials
+ * Get Moss project credentials for authenticated users
+ *
+ * Headers:
+ *   Authorization: Bearer <access_token>
+ *
+ * Response:
+ *   {
+ *     project_id: "277ab6a1-e353-40f6-b1e5-1d12bd5e2ab6",
+ *     project_key: "moss_82dsnxO2GYhzPSWuAQtQVuYjDQae0LV6"
+ *   }
+ */
+router.get(
+  "/v1/moss/credentials",
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.userId!;
+
+    logger.debug("Moss credentials request", { userId });
+
+    res.json({
+      project_id: config.mossProjectId,
+      project_key: config.mossProjectKey,
+    });
+  })
+);
+
+/**
+ * GET /v1/morph/credentials
+ * Get Morph API key for authenticated users
+ *
+ * Headers:
+ *   Authorization: Bearer <access_token>
+ *
+ * Response:
+ *   {
+ *     api_key: "morph_xxxxxxxxxxxxx"
+ *   }
+ *
+ * Error Response (if not configured):
+ *   Status: 503
+ *   {
+ *     error: "Morph credentials not configured on server"
+ *   }
+ */
+router.get(
+  "/v1/morph/credentials",
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.userId!;
+
+    logger.debug("Morph credentials request", { userId });
+
+    if (!config.morphApiKey) {
+      res.status(503).json({
+        error: "Morph credentials not configured on server",
+      });
+      return;
+    }
+
+    res.json({
+      api_key: config.morphApiKey,
+    });
   })
 );
 

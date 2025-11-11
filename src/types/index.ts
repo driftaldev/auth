@@ -1,7 +1,7 @@
 // TypeScript type definitions for ScoutCLI Backend
 
-import { Request } from 'express';
-import { User } from '@supabase/supabase-js';
+import { Request } from "express";
+import { User } from "@supabase/supabase-js";
 
 // ============================================================================
 // Database Types
@@ -34,7 +34,7 @@ export interface UsageLog {
   completion_tokens: number | null;
   total_tokens: number | null;
   request_duration_ms: number | null;
-  status: 'success' | 'error' | 'rate_limited';
+  status: "success" | "error" | "rate_limited";
   error_message: string | null;
   created_at: string;
 }
@@ -67,7 +67,7 @@ export interface TokenRefreshResponse {
 
 // LLM Chat Completions
 export interface Message {
-  role: 'system' | 'user' | 'assistant';
+  role: "system" | "user" | "assistant";
   content: string;
 }
 
@@ -85,10 +85,10 @@ export interface ChatCompletionRequest {
 
 export interface ChatCompletionChoice {
   message: {
-    role: 'assistant';
+    role: "assistant";
     content: string;
   };
-  finish_reason: 'stop' | 'length' | 'content_filter' | null;
+  finish_reason: "stop" | "length" | "content_filter" | null;
   index: number;
 }
 
@@ -100,7 +100,7 @@ export interface ChatCompletionUsage {
 
 export interface ChatCompletionResponse {
   id: string;
-  object: 'chat.completion';
+  object: "chat.completion";
   created: number;
   model: string;
   choices: ChatCompletionChoice[];
@@ -110,16 +110,16 @@ export interface ChatCompletionResponse {
 // Streaming
 export interface ChatCompletionChunk {
   id: string;
-  object: 'chat.completion.chunk';
+  object: "chat.completion.chunk";
   created: number;
   model: string;
   choices: Array<{
     index: number;
     delta: {
-      role?: 'assistant';
+      role?: "assistant";
       content?: string;
     };
-    finish_reason: 'stop' | 'length' | 'content_filter' | null;
+    finish_reason: "stop" | "length" | "content_filter" | null;
   }>;
 }
 
@@ -147,7 +147,7 @@ export interface AuthenticatedRequest extends Request {
 export interface Config {
   // Server
   port: number;
-  nodeEnv: 'development' | 'production' | 'test';
+  nodeEnv: "development" | "production" | "test";
 
   // Supabase
   supabaseUrl: string;
@@ -161,6 +161,13 @@ export interface Config {
   // LLM Providers
   openaiApiKey: string;
 
+  // Moss (Semantic Code Search)
+  mossProjectId: string;
+  mossProjectKey: string;
+
+  // Morph (Fast Apply)
+  morphApiKey?: string;
+
   // Rate Limiting
   rateLimitWindowMs: number;
   rateLimitMaxRequests: number;
@@ -173,7 +180,7 @@ export interface Config {
   cliCallbackUrlPattern: string;
 
   // Logging
-  logLevel: 'error' | 'warn' | 'info' | 'debug';
+  logLevel: "error" | "warn" | "info" | "debug";
   logFile?: string;
 
   // Authentication
@@ -197,54 +204,54 @@ export class AppError extends Error {
     public details?: unknown
   ) {
     super(message);
-    this.name = 'AppError';
+    this.name = "AppError";
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
 export class AuthenticationError extends AppError {
-  constructor(message: string = 'Authentication failed', details?: unknown) {
-    super(401, message, 'AUTH_ERROR', details);
-    this.name = 'AuthenticationError';
+  constructor(message: string = "Authentication failed", details?: unknown) {
+    super(401, message, "AUTH_ERROR", details);
+    this.name = "AuthenticationError";
   }
 }
 
 export class AuthorizationError extends AppError {
-  constructor(message: string = 'Not authorized', details?: unknown) {
-    super(403, message, 'AUTHORIZATION_ERROR', details);
-    this.name = 'AuthorizationError';
+  constructor(message: string = "Not authorized", details?: unknown) {
+    super(403, message, "AUTHORIZATION_ERROR", details);
+    this.name = "AuthorizationError";
   }
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string = 'Validation failed', details?: unknown) {
-    super(400, message, 'VALIDATION_ERROR', details);
-    this.name = 'ValidationError';
+  constructor(message: string = "Validation failed", details?: unknown) {
+    super(400, message, "VALIDATION_ERROR", details);
+    this.name = "ValidationError";
   }
 }
 
 export class RateLimitError extends AppError {
-  constructor(message: string = 'Rate limit exceeded', retryAfter?: number) {
-    super(429, message, 'RATE_LIMIT_ERROR', { retryAfter });
-    this.name = 'RateLimitError';
+  constructor(message: string = "Rate limit exceeded", retryAfter?: number) {
+    super(429, message, "RATE_LIMIT_ERROR", { retryAfter });
+    this.name = "RateLimitError";
   }
 }
 
 export class NotFoundError extends AppError {
-  constructor(message: string = 'Resource not found', details?: unknown) {
-    super(404, message, 'NOT_FOUND_ERROR', details);
-    this.name = 'NotFoundError';
+  constructor(message: string = "Resource not found", details?: unknown) {
+    super(404, message, "NOT_FOUND_ERROR", details);
+    this.name = "NotFoundError";
   }
 }
 
 export class ProviderError extends AppError {
   constructor(
-    message: string = 'LLM provider error',
+    message: string = "LLM provider error",
     provider: string,
     details?: unknown
   ) {
-    super(502, message, 'PROVIDER_ERROR', { provider, ...details });
-    this.name = 'ProviderError';
+    super(502, message, "PROVIDER_ERROR", { provider, ...details });
+    this.name = "ProviderError";
   }
 }
 
@@ -253,9 +260,9 @@ export class ProviderError extends AppError {
 // ============================================================================
 
 export interface HealthCheckResponse {
-  status: 'ok' | 'degraded' | 'error';
-  supabase: 'connected' | 'disconnected';
-  redis: 'connected' | 'disconnected';
+  status: "ok" | "degraded" | "error";
+  supabase: "connected" | "disconnected";
+  redis: "connected" | "disconnected";
   timestamp: string;
   version?: string;
 }
@@ -264,7 +271,7 @@ export interface HealthCheckResponse {
 // Model Mapping Types
 // ============================================================================
 
-export type LLMProvider = 'openai';
+export type LLMProvider = "openai";
 
 export interface ModelInfo {
   name: string;
@@ -275,21 +282,21 @@ export interface ModelInfo {
 
 export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
   // OpenAI models
-  'gpt-4-turbo': {
-    name: 'gpt-4-turbo',
-    provider: 'openai',
+  "gpt-4-turbo": {
+    name: "gpt-4-turbo",
+    provider: "openai",
     maxTokens: 4096,
     supportsStreaming: true,
   },
-  'gpt-4': {
-    name: 'gpt-4',
-    provider: 'openai',
+  "gpt-4": {
+    name: "gpt-4",
+    provider: "openai",
     maxTokens: 8192,
     supportsStreaming: true,
   },
-  'gpt-3.5-turbo': {
-    name: 'gpt-3.5-turbo',
-    provider: 'openai',
+  "gpt-3.5-turbo": {
+    name: "gpt-3.5-turbo",
+    provider: "openai",
     maxTokens: 4096,
     supportsStreaming: true,
   },

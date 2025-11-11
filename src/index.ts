@@ -1,24 +1,24 @@
 // ScoutCLI Backend - Main entry point
 
-import express, { Express } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { config, isProduction } from './config/index.js';
-import { logger } from './config/logger.js';
-import { initializeSupabase } from './services/supabase.js';
-import { initializePrisma, disconnectPrisma } from './services/prisma.js';
+import express, { Express } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import { config, isProduction } from "./config/index.js";
+import { logger } from "./config/logger.js";
+import { initializeSupabase } from "./services/supabase.js";
+import { initializePrisma, disconnectPrisma } from "./services/prisma.js";
 import {
   errorHandler,
   notFoundHandler,
   requestLogger,
   requestTimeout,
-} from './middleware/error.js';
-import { globalRateLimiter } from './middleware/rate-limit.js';
+} from "./middleware/error.js";
+import { globalRateLimiter } from "./middleware/rate-limit.js";
 
 // Import routes
-import authRoutes from './routes/auth.js';
-import proxyRoutes from './routes/proxy.js';
-import healthRoutes from './routes/health.js';
+import authRoutes from "./routes/auth.js";
+import proxyRoutes from "./routes/proxy.js";
+import healthRoutes from "./routes/health.js";
 
 // Initialize Express app
 const app: Express = express();
@@ -29,7 +29,7 @@ const app: Express = express();
 
 // Trust proxy if configured (required for Railway, Render, etc.)
 if (config.trustProxy) {
-  app.set('trust proxy', true);
+  app.set("trust proxy", true);
 }
 
 // Security headers
@@ -42,7 +42,10 @@ app.use(
 
 // CORS configuration
 const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  origin: (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ) => {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) {
       return callback(null, true);
@@ -51,8 +54,8 @@ const corsOptions = {
     // Check if origin matches allowed patterns
     const isAllowed = config.allowedOrigins.some((allowedOrigin) => {
       // Support wildcard patterns like http://localhost:*
-      if (allowedOrigin.includes('*')) {
-        const pattern = allowedOrigin.replace('*', '.*');
+      if (allowedOrigin.includes("*")) {
+        const pattern = allowedOrigin.replace("*", ".*");
         const regex = new RegExp(`^${pattern}$`);
         return regex.test(origin);
       }
@@ -62,20 +65,20 @@ const corsOptions = {
     if (isAllowed) {
       callback(null, true);
     } else {
-      logger.warn('CORS blocked origin', { origin });
-      callback(new Error('Not allowed by CORS'));
+      logger.warn("CORS blocked origin", { origin });
+      callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
 
 // Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Request logging
 app.use(requestLogger);
@@ -91,47 +94,49 @@ app.use(globalRateLimiter);
 // ============================================================================
 
 // Serve static files (auth page, etc.)
-app.use(express.static('public'));
+app.use(express.static("public"));
 
 // ============================================================================
 // Routes
 // ============================================================================
 
 // Health check (no rate limiting)
-app.use('/health', healthRoutes);
+app.use("/health", healthRoutes);
 
 // Authentication routes
-app.use('/auth', authRoutes);
+app.use("/auth", authRoutes);
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get("/", (req, res) => {
   res.json({
-    name: 'ScoutCLI Backend',
-    version: '1.0.0',
-    status: 'running',
+    name: "ScoutCLI Backend",
+    version: "1.0.0",
+    status: "running",
     endpoints: {
-      health: '/health',
+      health: "/health",
       auth: {
-        token: 'POST /auth/token',
-        refresh: 'POST /auth/refresh',
-        signup: 'POST /auth/signup',
-        signin: 'POST /auth/signin',
+        token: "POST /auth/token",
+        refresh: "POST /auth/refresh",
+        signup: "POST /auth/signup",
+        signin: "POST /auth/signin",
       },
       proxy: {
-        chat: 'POST /v1/chat/completions',
-        usage: 'GET /v1/usage',
-        models: 'GET /v1/models',
+        chat: "POST /v1/chat/completions",
+        usage: "GET /v1/usage",
+        models: "GET /v1/models",
+        mossCredentials: "GET /v1/moss/credentials",
+        morphCredentials: "GET /v1/morph/credentials",
       },
       web: {
-        auth: 'GET /cli/auth',
+        auth: "GET /cli/auth",
       },
     },
   });
 });
 
 // CLI auth endpoint (serves the web authentication page)
-app.get('/cli/auth', (req, res) => {
-  res.sendFile('auth.html', { root: 'public' });
+app.get("/cli/auth", (req, res) => {
+  res.sendFile("auth.html", { root: "public" });
 });
 
 // LLM proxy routes (must come after public endpoints to avoid auth redirect loop)
@@ -153,15 +158,15 @@ app.use(errorHandler);
 
 async function startServer() {
   try {
-    logger.info('Starting ScoutCLI Backend...');
+    logger.info("Starting ScoutCLI Backend...");
 
     // Initialize Prisma (database ORM)
     initializePrisma();
-    logger.info('✓ Prisma client initialized');
+    logger.info("✓ Prisma client initialized");
 
     // Initialize Supabase (authentication only)
     initializeSupabase();
-    logger.info('✓ Supabase Auth initialized');
+    logger.info("✓ Supabase Auth initialized");
 
     // Start server
     app.listen(config.port, () => {
@@ -169,24 +174,24 @@ async function startServer() {
       logger.info(`✓ Environment: ${config.nodeEnv}`);
       logger.info(`✓ Health check: http://localhost:${config.port}/health`);
       logger.info(`✓ Web auth page: http://localhost:${config.port}/cli/auth`);
-      logger.info('');
-      logger.info('🚀 ScoutCLI Backend is ready!');
+      logger.info("");
+      logger.info("🚀 ScoutCLI Backend is ready!");
     });
   } catch (error) {
-    logger.error('Failed to start server', { error });
+    logger.error("Failed to start server", { error });
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully...');
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM received, shutting down gracefully...");
   await disconnectPrisma();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully...');
+process.on("SIGINT", async () => {
+  logger.info("SIGINT received, shutting down gracefully...");
   await disconnectPrisma();
   process.exit(0);
 });
