@@ -97,7 +97,7 @@ router.get(
 router.post(
   '/token',
   strictRateLimiter,
-  validate(tokenExchangeSchema),
+  validate({ body: tokenExchangeSchema.shape.body }),
   asyncHandler(async (req: Request, res: Response) => {
     const { code } = req.body;
 
@@ -126,7 +126,7 @@ router.post(
 router.post(
   '/refresh',
   strictRateLimiter,
-  validate(tokenRefreshSchema),
+  validate({ body: tokenRefreshSchema.shape.body }),
   asyncHandler(async (req: Request, res: Response) => {
     const { refresh_token } = req.body;
 
@@ -156,7 +156,7 @@ router.post(
 router.post(
   '/otp/send',
   strictRateLimiter,
-  validate(sendOTPSchema),
+  validate({ body: sendOTPSchema.shape.body }),
   asyncHandler(async (req: Request, res: Response) => {
     const { email } = req.body;
 
@@ -187,7 +187,7 @@ router.post(
 router.post(
   '/otp/verify',
   strictRateLimiter,
-  validate(verifyOTPSchema),
+  validate({ body: verifyOTPSchema.shape.body }),
   asyncHandler(async (req: Request, res: Response) => {
     const { email, token } = req.body;
 
@@ -243,7 +243,7 @@ router.get(
  */
 router.get(
   '/oauth/google/callback',
-  validate(googleOAuthCallbackSchema),
+  validate({ query: googleOAuthCallbackSchema.shape.query }),
   asyncHandler(async (req: Request, res: Response) => {
     const { code } = req.query;
 

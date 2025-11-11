@@ -107,7 +107,7 @@ export const logLLMRequest = (
 };
 
 export const logAuthentication = (
-  event: 'login' | 'logout' | 'token_exchange' | 'token_refresh',
+  event: 'login' | 'logout' | 'token_exchange' | 'token_refresh' | 'otp_login' | 'google_oauth',
   userId: string,
   success: boolean,
   details?: Record<string, unknown>

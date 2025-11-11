@@ -130,7 +130,7 @@ export async function makeAnthropicRequest(
 
     logger.debug('Making Anthropic API request', { model, userId });
 
-    const response = await client.messages.create(anthropicRequest);
+    const response = await client.messages.create(anthropicRequest) as Anthropic.Message;
 
     const duration = Date.now() - startTime;
     const totalTokens =

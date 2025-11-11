@@ -11,8 +11,9 @@ let redis: Redis | null = null;
 
 function getRedisClient(): Redis {
   if (!redis) {
-    redis = Redis.fromEnv({
+    redis = new Redis({
       url: config.redisUrl,
+      token: config.redisToken,
     });
     logger.info('Upstash Redis client initialized');
   }

@@ -131,6 +131,38 @@ export interface ChatCompletionChunk {
 export type OpenAIRequest = ChatCompletionRequest;
 export type OpenAIResponse = ChatCompletionResponse;
 
+// Anthropic
+export interface AnthropicRequest {
+  model: string;
+  max_tokens: number;
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+  system?: string;
+  temperature?: number;
+  top_p?: number;
+  stop_sequences?: string[];
+  stream?: boolean;
+}
+
+export interface AnthropicResponse {
+  id: string;
+  type: 'message';
+  role: 'assistant';
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+  model: string;
+  stop_reason: string | null;
+  stop_sequence: string | null;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
 // ============================================================================
 // Express Types
 // ============================================================================
@@ -157,9 +189,11 @@ export interface Config {
 
   // Redis
   redisUrl: string;
+  redisToken: string;
 
   // LLM Providers
   openaiApiKey: string;
+  anthropicApiKey: string;
 
   // Moss (Semantic Code Search)
   mossProjectId: string;
@@ -249,9 +283,9 @@ export class ProviderError extends AppError {
   constructor(
     message: string = "LLM provider error",
     provider: string,
-    details?: unknown
+    details?: Record<string, unknown>
   ) {
-    super(502, message, "PROVIDER_ERROR", { provider, ...details });
+    super(502, message, "PROVIDER_ERROR", { provider, ...(details || {}) });
     this.name = "ProviderError";
   }
 }
@@ -272,7 +306,7 @@ export interface HealthCheckResponse {
 // Model Mapping Types
 // ============================================================================
 
-export type LLMProvider = "openai";
+export type LLMProvider = "openai" | "anthropic";
 
 export interface ModelInfo {
   name: string;
