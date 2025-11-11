@@ -201,31 +201,65 @@ export async function refreshAccessToken(
 }
 
 /**
- * Sign up a new user with email and password
+ * Send OTP (one-time password) to user's email
  */
-export async function signUpUser(
-  email: string,
-  password: string,
-  primaryModel?: string,
-  fallbackModel?: string
-): Promise<{ userId: string; email: string }> {
+export async function sendOTP(
+  email: string
+): Promise<{ success: boolean; message: string }> {
   try {
-    // Create user in Supabase auth
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.signUp({
+    // Use Supabase's signInWithOtp for passwordless authentication
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
+      options: {
+        shouldCreateUser: true, // Auto-create user if they don't exist
+      },
     });
 
     if (error) {
-      logger.error('Failed to sign up user', { error, email });
+      logger.error('Failed to send OTP', { error, email });
       throw new ValidationError(error.message);
     }
 
-    if (!user) {
-      throw new Error('User creation failed');
+    logger.info('OTP sent successfully', { email });
+
+    return {
+      success: true,
+      message: 'OTP sent to your email',
+    };
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    logger.error('Error sending OTP', { error, email });
+    throw new Error('Failed to send OTP');
+  }
+}
+
+/**
+ * Verify OTP and return user info
+ */
+export async function verifyOTP(
+  email: string,
+  token: string
+): Promise<{ userId: string; email: string }> {
+  try {
+    // Verify the OTP token with Supabase
+    const {
+      data: { user, session },
+      error,
+    } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+
+    if (error) {
+      logger.warn('Failed to verify OTP', { error: error.message, email });
+      throw new AuthenticationError('Invalid or expired OTP');
+    }
+
+    if (!user || !session) {
+      throw new AuthenticationError('OTP verification failed');
     }
 
     // Create user profile using Prisma (if not auto-created by trigger)
@@ -234,72 +268,118 @@ export async function signUpUser(
         where: { id: user.id },
         create: {
           id: user.id,
-          primaryModel: primaryModel || 'claude-3-5-sonnet-20241022',
-          fallbackModel: fallbackModel || null,
+          primaryModel: 'claude-3-5-sonnet-20241022',
+          fallbackModel: null,
         },
-        update: {
-          primaryModel: primaryModel,
-          fallbackModel: fallbackModel,
-        },
+        update: {},
       });
     } catch (profileError) {
       logger.warn('Failed to create/update user profile', { error: profileError, userId: user.id });
     }
 
-    logger.info('User signed up successfully', { userId: user.id, email });
+    logAuthentication('otp_login', user.id, true);
 
     return {
       userId: user.id,
       email: user.email!,
-    };
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      throw error;
-    }
-    logger.error('Error signing up user', { error, email });
-    throw new Error('Failed to sign up user');
-  }
-}
-
-/**
- * Sign in user with email and password
- */
-export async function signInUser(
-  email: string,
-  password: string
-): Promise<{ userId: string; email: string; accessToken: string; refreshToken: string }> {
-  try {
-    const {
-      data: { user, session },
-      error,
-    } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      logger.warn('Failed to sign in user', { error: error.message, email });
-      throw new AuthenticationError('Invalid email or password');
-    }
-
-    if (!user || !session) {
-      throw new AuthenticationError('Sign in failed');
-    }
-
-    logAuthentication('login', user.id, true);
-
-    return {
-      userId: user.id,
-      email: user.email!,
-      accessToken: session.access_token,
-      refreshToken: session.refresh_token,
     };
   } catch (error) {
     if (error instanceof AuthenticationError) {
       throw error;
     }
-    logger.error('Error signing in user', { error, email });
-    throw new AuthenticationError('Failed to sign in');
+    logger.error('Error verifying OTP', { error, email });
+    throw new AuthenticationError('Failed to verify OTP');
+  }
+}
+
+/**
+ * Initiate Google OAuth flow
+ * Returns the OAuth URL to redirect the user to
+ */
+export async function initiateGoogleOAuth(
+  redirectUrl: string
+): Promise<{ url: string }> {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      logger.error('Failed to initiate Google OAuth', { error });
+      throw new AuthenticationError('Failed to initiate Google OAuth');
+    }
+
+    if (!data.url) {
+      throw new AuthenticationError('OAuth URL not generated');
+    }
+
+    logger.info('Google OAuth initiated', { redirectUrl });
+
+    return {
+      url: data.url,
+    };
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      throw error;
+    }
+    logger.error('Error initiating Google OAuth', { error });
+    throw new AuthenticationError('Failed to initiate Google OAuth');
+  }
+}
+
+/**
+ * Handle Google OAuth callback
+ * Exchange the OAuth code for a Supabase session
+ */
+export async function handleGoogleCallback(
+  code: string
+): Promise<{ userId: string; email: string }> {
+  try {
+    // Exchange the OAuth code for a session
+    const {
+      data: { user, session },
+      error,
+    } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      logger.error('Failed to exchange OAuth code', { error });
+      throw new AuthenticationError('Failed to authenticate with Google');
+    }
+
+    if (!user || !session) {
+      throw new AuthenticationError('Google OAuth authentication failed');
+    }
+
+    // Create user profile using Prisma (if not auto-created by trigger)
+    try {
+      await prisma.userProfile.upsert({
+        where: { id: user.id },
+        create: {
+          id: user.id,
+          primaryModel: 'claude-3-5-sonnet-20241022',
+          fallbackModel: null,
+        },
+        update: {},
+      });
+    } catch (profileError) {
+      logger.warn('Failed to create/update user profile', { error: profileError, userId: user.id });
+    }
+
+    logAuthentication('google_oauth', user.id, true);
+
+    return {
+      userId: user.id,
+      email: user.email!,
+    };
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      throw error;
+    }
+    logger.error('Error handling Google OAuth callback', { error });
+    throw new AuthenticationError('Failed to handle Google OAuth callback');
   }
 }
 

@@ -47,6 +47,7 @@ const configSchema = z.object({
     .transform((val) => val.split(",")),
 
   // URLs
+  BASE_URL: z.string().url().default("http://localhost:3000"),
   FRONTEND_URL: z.string().url().default("https://scoutcode.com"),
   CLI_CALLBACK_URL_PATTERN: z.string().default("http://localhost:*"),
 
@@ -89,6 +90,7 @@ function loadConfig(): Config {
       rateLimitWindowMs: parsed.RATE_LIMIT_WINDOW_MS,
       rateLimitMaxRequests: parsed.RATE_LIMIT_MAX_REQUESTS,
       allowedOrigins: parsed.ALLOWED_ORIGINS,
+      baseUrl: parsed.BASE_URL,
       frontendUrl: parsed.FRONTEND_URL,
       cliCallbackUrlPattern: parsed.CLI_CALLBACK_URL_PATTERN,
       logLevel: parsed.LOG_LEVEL,

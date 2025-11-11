@@ -176,6 +176,7 @@ export interface Config {
   allowedOrigins: string[];
 
   // URLs
+  baseUrl: string;
   frontendUrl: string;
   cliCallbackUrlPattern: string;
 

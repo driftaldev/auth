@@ -7,8 +7,10 @@ import { strictRateLimiter } from '../middleware/rate-limit.js';
 import {
   exchangeCodeForTokens,
   refreshAccessToken,
-  signUpUser,
-  signInUser,
+  sendOTP,
+  verifyOTP,
+  initiateGoogleOAuth,
+  handleGoogleCallback,
   createAuthorizationCode,
   updateUserModelPreferences,
 } from '../services/auth.js';
@@ -33,19 +35,22 @@ const tokenRefreshSchema = z.object({
   }),
 });
 
-const signUpSchema = z.object({
+const sendOTPSchema = z.object({
   body: z.object({
     email: z.string().email('Invalid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
-    primary_model: z.string().optional(),
-    fallback_model: z.string().optional(),
   }),
 });
 
-const signInSchema = z.object({
+const verifyOTPSchema = z.object({
   body: z.object({
     email: z.string().email('Invalid email address'),
-    password: z.string().min(1, 'Password is required'),
+    token: z.string().min(6, 'OTP must be at least 6 characters'),
+  }),
+});
+
+const googleOAuthCallbackSchema = z.object({
+  query: z.object({
+    code: z.string().min(1, 'OAuth code is required'),
   }),
 });
 
@@ -134,15 +139,43 @@ router.post(
 );
 
 /**
- * POST /auth/signup
- * Register a new user with email and password
+ * POST /auth/otp/send
+ * Send OTP to user's email for passwordless authentication
+ *
+ * Request body:
+ *   {
+ *     email: "user@example.com"
+ *   }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     message: "OTP sent to your email"
+ *   }
+ */
+router.post(
+  '/otp/send',
+  strictRateLimiter,
+  validate(sendOTPSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email } = req.body;
+
+    logger.info('OTP send request', { email });
+
+    const result = await sendOTP(email);
+
+    res.json(result);
+  })
+);
+
+/**
+ * POST /auth/otp/verify
+ * Verify OTP and return user information
  *
  * Request body:
  *   {
  *     email: "user@example.com",
- *     password: "password123",
- *     primary_model: "claude-3-5-sonnet-20241022" (optional),
- *     fallback_model: "gpt-4" (optional)
+ *     token: "123456"
  *   }
  *
  * Response:
@@ -152,57 +185,73 @@ router.post(
  *   }
  */
 router.post(
-  '/signup',
+  '/otp/verify',
   strictRateLimiter,
-  validate(signUpSchema),
+  validate(verifyOTPSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password, primary_model, fallback_model } = req.body;
+    const { email, token } = req.body;
 
-    logger.info('User signup request', { email });
+    logger.info('OTP verify request', { email });
 
-    const user = await signUpUser(email, password, primary_model, fallback_model);
+    const result = await verifyOTP(email, token);
 
-    res.status(201).json({
-      user_id: user.userId,
-      email: user.email,
+    res.json({
+      user_id: result.userId,
+      email: result.email,
     });
   })
 );
 
 /**
- * POST /auth/signin
- * Sign in with email and password
+ * GET /auth/oauth/google
+ * Initiate Google OAuth flow
  *
- * Request body:
- *   {
- *     email: "user@example.com",
- *     password: "password123"
- *   }
+ * Query params:
+ *   redirect_url: URL to redirect back to after OAuth (e.g., http://localhost:3333/callback)
  *
  * Response:
  *   {
- *     access_token: "jwt_token",
- *     refresh_token: "refresh_token",
- *     expires_in: 3600,
+ *     url: "https://accounts.google.com/o/oauth2/v2/auth?..."
+ *   }
+ */
+router.get(
+  '/oauth/google',
+  asyncHandler(async (req: Request, res: Response) => {
+    const redirectUrl = req.query.redirect_url as string || `${config.baseUrl}/auth/oauth/google/callback`;
+
+    logger.info('Google OAuth initiation request', { redirectUrl });
+
+    const result = await initiateGoogleOAuth(redirectUrl);
+
+    res.json(result);
+  })
+);
+
+/**
+ * GET /auth/oauth/google/callback
+ * Handle Google OAuth callback
+ *
+ * Query params:
+ *   code: OAuth authorization code from Google
+ *   state: CSRF token (optional)
+ *
+ * Response:
+ *   {
  *     user_id: "uuid",
  *     email: "user@example.com"
  *   }
  */
-router.post(
-  '/signin',
-  strictRateLimiter,
-  validate(signInSchema),
+router.get(
+  '/oauth/google/callback',
+  validate(googleOAuthCallbackSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body;
+    const { code } = req.query;
 
-    logger.info('User signin request', { email });
+    logger.info('Google OAuth callback received');
 
-    const result = await signInUser(email, password);
+    const result = await handleGoogleCallback(code as string);
 
     res.json({
-      access_token: result.accessToken,
-      refresh_token: result.refreshToken,
-      expires_in: 3600,
       user_id: result.userId,
       email: result.email,
     });

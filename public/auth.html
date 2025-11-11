@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Driftal Authentication</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
       * {
         margin: 0;
@@ -274,8 +273,18 @@
       <div class="loading" id="loading">Authenticating...</div>
 
       <div class="auth-form" id="authForm">
-        <form id="loginForm">
-          <div class="form-group">
+        <!-- Google OAuth Button -->
+        <button type="button" class="button" id="googleBtn" style="background: #4285f4; margin-bottom: 20px;">
+          Sign in with Google
+        </button>
+
+        <div class="divider">
+          <span>or continue with email</span>
+        </div>
+
+        <!-- OTP Authentication -->
+        <form id="otpForm">
+          <div class="form-group" id="emailGroup">
             <label for="email">Email</label>
             <input
               type="email"
@@ -285,21 +294,21 @@
               placeholder="you@example.com"
             />
           </div>
-          <div class="form-group">
-            <label for="password">Password</label>
+          <div class="form-group" id="otpGroup" style="display: none;">
+            <label for="otp">Enter verification code</label>
             <input
-              type="password"
-              id="password"
-              name="password"
+              type="text"
+              id="otp"
+              name="otp"
               required
-              placeholder="••••••••"
+              placeholder="123456"
+              maxlength="6"
+              pattern="[0-9]{6}"
             />
+            <div class="model-info">Check your email for the 6-digit code</div>
           </div>
-          <button type="submit" class="button" id="submitBtn">Sign In</button>
+          <button type="submit" class="button" id="submitBtn">Send Code</button>
         </form>
-        <div class="toggle-link" id="toggleForm">
-          Don't have an account? <strong>Sign Up</strong>
-        </div>
       </div>
 
       <div class="model-selection" id="modelSelection">
@@ -320,138 +329,173 @@
       // DOM elements
       const authForm = document.getElementById("authForm");
       const modelSelection = document.getElementById("modelSelection");
-      const loginForm = document.getElementById("loginForm");
-      const toggleForm = document.getElementById("toggleForm");
+      const otpForm = document.getElementById("otpForm");
+      const googleBtn = document.getElementById("googleBtn");
       const submitBtn = document.getElementById("submitBtn");
       const authorizeBtn = document.getElementById("authorizeBtn");
+      const emailGroup = document.getElementById("emailGroup");
+      const otpGroup = document.getElementById("otpGroup");
       const errorDiv = document.getElementById("error");
       const successDiv = document.getElementById("success");
       const loadingDiv = document.getElementById("loading");
 
-      let supabaseClient = null;
-      let isSignUp = false;
       let currentUser = null;
+      let currentEmail = null;
+      let otpSent = false;
 
-      // Prepare UI until configuration loads
+      // Prepare UI until ready
       authForm.style.display = "none";
       modelSelection.style.display = "none";
       submitBtn.disabled = true;
       authorizeBtn.disabled = true;
-      showLoading("Loading authentication configuration...");
+      googleBtn.disabled = true;
+      showLoading("Loading...");
 
-      initializeSupabase();
+      // Initialize
+      setTimeout(() => {
+        submitBtn.disabled = false;
+        authorizeBtn.disabled = false;
+        googleBtn.disabled = false;
+        authForm.style.display = "block";
+        clearMessages();
+      }, 500);
 
-      async function initializeSupabase() {
+      // Check if state parameter is present
+      if (!state) {
+        showError("Invalid authentication request. Missing state parameter.");
+      }
+
+      // Handle Google OAuth callback (if code parameter exists)
+      const oauthCode = urlParams.get("code");
+      if (oauthCode) {
+        handleGoogleCallback(oauthCode);
+      }
+
+      async function handleGoogleCallback(code) {
+        showLoading("Completing Google sign in...");
+        authForm.style.display = "none";
+
         try {
-          const response = await fetch("/auth/config", { cache: "no-store" });
+          const response = await fetch(`/auth/oauth/google/callback?code=${encodeURIComponent(code)}`);
 
           if (!response.ok) {
-            throw new Error("Failed to load authentication configuration");
+            throw new Error("Failed to complete Google sign in");
           }
 
-          const { supabaseUrl, supabaseAnonKey } = await response.json();
+          const result = await response.json();
 
-          if (!supabaseUrl || !supabaseAnonKey) {
-            throw new Error("Authentication configuration is incomplete");
-          }
+          currentUser = { id: result.user_id, email: result.email };
 
-          const supabaseLibrary = window.supabase;
+          showSuccess("Signed in with Google successfully!");
 
-          if (
-            !supabaseLibrary ||
-            typeof supabaseLibrary.createClient !== "function"
-          ) {
-            throw new Error("Supabase SDK failed to load");
-          }
-
-          supabaseClient = supabaseLibrary.createClient(
-            supabaseUrl,
-            supabaseAnonKey
-          );
-
-          submitBtn.disabled = false;
-          authorizeBtn.disabled = false;
-          authForm.style.display = "block";
-          modelSelection.style.display = "none";
-          errorDiv.style.display = "none";
-          successDiv.style.display = "none";
+          // Show authorize button
           loadingDiv.style.display = "none";
-          loadingDiv.textContent = "Authenticating...";
+          modelSelection.style.display = "block";
         } catch (error) {
-          console.error(
-            "Failed to initialize authentication configuration",
-            error
-          );
-          showError(
-            "Failed to load authentication configuration. Please refresh the page."
-          );
+          showError(error.message || "Google sign in failed");
           loadingDiv.style.display = "none";
+          authForm.style.display = "block";
         }
       }
 
-      // Toggle between sign in and sign up
-      toggleForm.addEventListener("click", () => {
-        isSignUp = !isSignUp;
-        submitBtn.textContent = isSignUp ? "Sign Up" : "Sign In";
-        toggleForm.innerHTML = isSignUp
-          ? "Already have an account? <strong>Sign In</strong>"
-          : "Don't have an account? <strong>Sign Up</strong>";
+      // Handle Google OAuth
+      googleBtn.addEventListener("click", async () => {
+        googleBtn.disabled = true;
+        googleBtn.textContent = "Redirecting to Google...";
+        clearMessages();
+
+        try {
+          // Get current origin for callback
+          const redirectUrl = `${window.location.origin}/auth/oauth/google/callback?state=${state}&callback_port=${getCallbackPort()}`;
+
+          const response = await fetch(`/auth/oauth/google?redirect_url=${encodeURIComponent(redirectUrl)}`);
+
+          if (!response.ok) {
+            throw new Error("Failed to initiate Google OAuth");
+          }
+
+          const { url } = await response.json();
+
+          // Redirect to Google OAuth
+          window.location.href = url;
+        } catch (error) {
+          showError(error.message || "Failed to initiate Google sign in");
+          googleBtn.disabled = false;
+          googleBtn.textContent = "Sign in with Google";
+        }
       });
 
-      // Handle form submission
-      loginForm.addEventListener("submit", async (e) => {
+      // Handle OTP form submission
+      otpForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         clearMessages();
 
         const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
+        const otp = document.getElementById("otp").value;
 
         submitBtn.disabled = true;
-        submitBtn.textContent = isSignUp
-          ? "Creating account..."
-          : "Signing in...";
 
         try {
-          if (!supabaseClient) {
-            throw new Error(
-              "Authentication configuration not loaded. Please refresh the page."
-            );
-          }
+          if (!otpSent) {
+            // Step 1: Send OTP
+            submitBtn.textContent = "Sending code...";
 
-          let result;
-          if (isSignUp) {
-            result = await supabaseClient.auth.signUp({ email, password });
-          } else {
-            result = await supabaseClient.auth.signInWithPassword({
-              email,
-              password,
+            const response = await fetch("/auth/otp/send", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ email }),
             });
-          }
 
-          if (result.error) {
-            throw result.error;
-          }
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || "Failed to send OTP");
+            }
 
-          currentUser = result.data.user;
+            const result = await response.json();
 
-          if (isSignUp && !result.data.session) {
-            showSuccess("Check your email for confirmation link!");
+            currentEmail = email;
+            otpSent = true;
+
+            // Show OTP input field
+            emailGroup.style.display = "none";
+            otpGroup.style.display = "block";
+            submitBtn.textContent = "Verify Code";
             submitBtn.disabled = false;
-            submitBtn.textContent = "Sign Up";
-            return;
+
+            showSuccess(result.message || "Code sent! Check your email.");
+          } else {
+            // Step 2: Verify OTP
+            submitBtn.textContent = "Verifying...";
+
+            const response = await fetch("/auth/otp/verify", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ email: currentEmail, token: otp }),
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || "Invalid verification code");
+            }
+
+            const result = await response.json();
+
+            currentUser = { id: result.user_id, email: result.email };
+
+            showSuccess("Verified successfully!");
+
+            // Show authorize button
+            authForm.style.display = "none";
+            modelSelection.style.display = "block";
           }
-
-          showSuccess(
-            isSignUp ? "Account created!" : "Signed in successfully!"
-          );
-
-          // Show authorize button
-          authForm.style.display = "none";
-          modelSelection.style.display = "block";
         } catch (error) {
           showError(error.message || "Authentication failed");
           submitBtn.disabled = false;
-          submitBtn.textContent = isSignUp ? "Sign Up" : "Sign In";
+          submitBtn.textContent = otpSent ? "Verify Code" : "Send Code";
         }
       });
 
@@ -538,11 +582,6 @@
 
         // Port should be passed from CLI, default to 3333
         return "3333";
-      }
-
-      // Check if state parameter is present
-      if (!state) {
-        showError("Invalid authentication request. Missing state parameter.");
       }
     </script>
   </body>
