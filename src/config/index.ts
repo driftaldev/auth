@@ -45,7 +45,9 @@ const configSchema = z.object({
   // CORS
   ALLOWED_ORIGINS: z
     .string()
-    .default("http://localhost:8080,https://scoutcode.com,http://localhost:*")
+    .default(
+      "http://localhost:8080,http://localhost:*,https://auth.driftal.dev:*"
+    )
     .transform((val) => val.split(",")),
 
   // URLs
