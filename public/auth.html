@@ -546,7 +546,7 @@
           const data = await response.json();
 
           // Redirect back to CLI
-          const callbackUrl = `http://localhost:${getCallbackPort()}/callback?code=${
+          const callbackUrl = `http://127.0.0.1:${getCallbackPort()}/callback?code=${
             data.code
           }&state=${state}`;
           showSuccess("Authorization successful! Redirecting...");
