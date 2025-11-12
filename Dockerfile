@@ -1,6 +1,6 @@
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -21,17 +21,19 @@ COPY src ./src
 RUN npm run build
 
 # Stage 2: Production
-FROM node:20-alpine
+FROM node:20-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install OpenSSL 1.1 compatibility library for Prisma
-RUN apk add --no-cache openssl1.1-compat
+# Install OpenSSL and other required libraries for Prisma
+RUN apt-get update && \
+    apt-get install -y openssl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN groupadd -r nodejs && \
+    useradd -r -g nodejs nodejs
 
 # Copy package files
 COPY package*.json ./
