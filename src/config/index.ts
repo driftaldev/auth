@@ -49,8 +49,8 @@ const configSchema = z.object({
     .transform((val) => val.split(",")),
 
   // URLs
-  BASE_URL: z.string().url().default("http://localhost:3000"),
-  FRONTEND_URL: z.string().url().default("https://scoutcode.com"),
+  BASE_URL: z.string().url().default("https://auth.driftal.dev"),
+  FRONTEND_URL: z.string().url().default("https://driftal.dev"),
   CLI_CALLBACK_URL_PATTERN: z.string().default("http://localhost:*"),
 
   // Logging

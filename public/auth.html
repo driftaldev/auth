@@ -274,7 +274,12 @@
 
       <div class="auth-form" id="authForm">
         <!-- Google OAuth Button -->
-        <button type="button" class="button" id="googleBtn" style="background: #4285f4; margin-bottom: 20px;">
+        <button
+          type="button"
+          class="button"
+          id="googleBtn"
+          style="background: #4285f4; margin-bottom: 20px"
+        >
           Sign in with Google
         </button>
 
@@ -294,13 +299,12 @@
               placeholder="you@example.com"
             />
           </div>
-          <div class="form-group" id="otpGroup" style="display: none;">
+          <div class="form-group" id="otpGroup" style="display: none">
             <label for="otp">Enter verification code</label>
             <input
               type="text"
               id="otp"
               name="otp"
-              required
               placeholder="123456"
               maxlength="6"
               pattern="[0-9]{6}"
@@ -376,7 +380,9 @@
         authForm.style.display = "none";
 
         try {
-          const response = await fetch(`/auth/oauth/google/callback?code=${encodeURIComponent(code)}`);
+          const response = await fetch(
+            `/auth/oauth/google/callback?code=${encodeURIComponent(code)}`
+          );
 
           if (!response.ok) {
             throw new Error("Failed to complete Google sign in");
@@ -406,9 +412,13 @@
 
         try {
           // Get current origin for callback
-          const redirectUrl = `${window.location.origin}/auth/oauth/google/callback?state=${state}&callback_port=${getCallbackPort()}`;
+          const redirectUrl = `${
+            window.location.origin
+          }/auth/oauth/google/callback?state=${state}&callback_port=${getCallbackPort()}`;
 
-          const response = await fetch(`/auth/oauth/google?redirect_url=${encodeURIComponent(redirectUrl)}`);
+          const response = await fetch(
+            `/auth/oauth/google?redirect_url=${encodeURIComponent(redirectUrl)}`
+          );
 
           if (!response.ok) {
             throw new Error("Failed to initiate Google OAuth");
@@ -432,6 +442,9 @@
 
         const email = document.getElementById("email").value;
         const otp = document.getElementById("otp").value;
+
+        console.log("email", email);
+        console.log("otp", otp);
 
         submitBtn.disabled = true;
 
@@ -461,6 +474,7 @@
             // Show OTP input field
             emailGroup.style.display = "none";
             otpGroup.style.display = "block";
+            document.getElementById("otp").required = true;
             submitBtn.textContent = "Verify Code";
             submitBtn.disabled = false;
 
