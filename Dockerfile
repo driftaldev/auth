@@ -1,8 +1,12 @@
-
 # Stage 1: Build
 FROM node:20-slim AS builder
 
 WORKDIR /app
+
+# Install OpenSSL to match the production environment *before* installing dependencies
+RUN apt-get update && \
+    apt-get install -y openssl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
