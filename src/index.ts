@@ -53,8 +53,18 @@ const corsOptions = {
 
     // Check if origin matches allowed patterns
     const isAllowed = config.allowedOrigins.some((allowedOrigin) => {
-      // Support wildcard patterns like http://localhost:*
+      // Support wildcard patterns like http://localhost:* or https://auth.driftal.dev:*
       if (allowedOrigin.includes("*")) {
+        // Handle patterns ending with :* (match with or without port)
+        if (allowedOrigin.endsWith(":*")) {
+          const basePattern = allowedOrigin.slice(0, -2); // Remove ":*"
+          // Match exact domain or domain with any port
+          const regex = new RegExp(
+            `^${basePattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(:\\d+)?$`
+          );
+          return regex.test(origin);
+        }
+        // Handle other wildcard patterns
         const pattern = allowedOrigin.replace("*", ".*");
         const regex = new RegExp(`^${pattern}$`);
         return regex.test(origin);
