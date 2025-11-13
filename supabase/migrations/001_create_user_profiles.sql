@@ -1,5 +1,5 @@
 -- Create user_profiles table
--- Extends Supabase auth.users with custom fields for ScoutCLI
+-- Extends Supabase auth.users with custom fields for driftal
 
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -60,4 +60,4 @@ CREATE TRIGGER on_user_profiles_updated
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Add comment
-COMMENT ON TABLE public.user_profiles IS 'User profiles with LLM model preferences for ScoutCLI';
+COMMENT ON TABLE public.user_profiles IS 'User profiles with LLM model preferences for driftal';

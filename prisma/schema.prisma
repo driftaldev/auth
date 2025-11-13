@@ -1,4 +1,4 @@
-// Prisma schema for ScoutCLI Backend
+// Prisma schema for driftal Backend
 // Uses Supabase PostgreSQL database
 
 generator client {
@@ -16,7 +16,7 @@ datasource db {
 // ============================================================================
 
 /// User profiles extending Supabase auth.users
-/// Stores model preferences for ScoutCLI
+/// Stores model preferences for driftal
 model UserProfile {
   id             String   @id @db.Uuid // References auth.users(id)
   primaryModel   String   @default("claude-3-5-sonnet-20241022") @map("primary_model") @db.VarChar(100)

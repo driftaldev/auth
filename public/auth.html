@@ -14,7 +14,7 @@
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
-        background: #212529;
+        background: #000000;
         min-height: 100vh;
         display: flex;
         align-items: center;
@@ -23,9 +23,9 @@
       }
 
       .container {
-        background: #343a40;
+        background: #000000;
+        border: 1px solid #343a40;
         border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         max-width: 480px;
         width: 100%;
         padding: 40px;
@@ -75,30 +75,27 @@
         color: #f8f9fa;
       }
 
-      input:focus,
+      /* input:focus,
       select:focus {
         outline: none;
         border-color: #6c757d;
         background: #343a40;
-      }
+      } */
 
       .button {
         width: 100%;
         padding: 14px;
-        background: #495057;
+        background: #0f0f0f;
+        border: 1px solid #343a40;
         color: #f8f9fa;
-        border: none;
         border-radius: 8px;
         font-size: 16px;
         font-weight: 600;
         cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
       }
 
       .button:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(108, 117, 125, 0.4);
-        background: #6c757d;
+        background: #343a40;
       }
 
       .button:disabled {
@@ -278,8 +275,17 @@
           type="button"
           class="button"
           id="googleBtn"
-          style="background: #4285f4; margin-bottom: 20px"
+          style="
+            background: #000000;
+            margin-bottom: 20px;
+            border: 1px solid #343a40;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+          "
         >
+          <img src="/google.png" alt="Google" style="width: 20px; height: 20px;" />
           Sign in with Google
         </button>
 

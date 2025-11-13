@@ -1,4 +1,4 @@
-// TypeScript type definitions for ScoutCLI Backend
+// TypeScript type definitions for driftal Backend
 
 import { Request } from "express";
 import { User } from "@supabase/supabase-js";
@@ -136,7 +136,7 @@ export interface AnthropicRequest {
   model: string;
   max_tokens: number;
   messages: Array<{
-    role: 'user' | 'assistant';
+    role: "user" | "assistant";
     content: string;
   }>;
   system?: string;
@@ -148,10 +148,10 @@ export interface AnthropicRequest {
 
 export interface AnthropicResponse {
   id: string;
-  type: 'message';
-  role: 'assistant';
+  type: "message";
+  role: "assistant";
   content: Array<{
-    type: 'text';
+    type: "text";
     text: string;
   }>;
   model: string;

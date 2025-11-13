@@ -2,10 +2,10 @@
 // NOTE: Prisma is now used for database operations
 // Supabase is only used for authentication (JWT verification, user management)
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { config } from '../config/index.js';
-import { logger } from '../config/logger.js';
-import { verifyPrismaConnection } from './prisma.js';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { config } from "../config/index.js";
+import { logger } from "../config/logger.js";
+import { verifyPrismaConnection } from "./prisma.js";
 
 // Database types
 export interface Database {
@@ -61,7 +61,7 @@ export interface Database {
           completion_tokens: number | null;
           total_tokens: number | null;
           request_duration_ms: number | null;
-          status: 'success' | 'error' | 'rate_limited';
+          status: "success" | "error" | "rate_limited";
           error_message: string | null;
           created_at: string;
         };
@@ -73,7 +73,7 @@ export interface Database {
           completion_tokens?: number | null;
           total_tokens?: number | null;
           request_duration_ms?: number | null;
-          status?: 'success' | 'error' | 'rate_limited';
+          status?: "success" | "error" | "rate_limited";
           error_message?: string | null;
         };
       };
@@ -101,17 +101,17 @@ export function initializeSupabase(): SupabaseClient<Database> {
         },
         global: {
           headers: {
-            'X-Client-Info': 'scoutcli-backend',
+            "X-Client-Info": "driftal-backend",
           },
         },
       }
     );
 
-    logger.info('Supabase client initialized successfully');
+    logger.info("Supabase client initialized successfully");
     return supabaseClient;
   } catch (error) {
-    logger.error('Failed to initialize Supabase client', { error });
-    throw new Error('Failed to initialize Supabase client');
+    logger.error("Failed to initialize Supabase client", { error });
+    throw new Error("Failed to initialize Supabase client");
   }
 }
 
@@ -137,21 +137,23 @@ export async function verifySupabaseConnection(): Promise<boolean> {
     });
 
     if (error) {
-      logger.error('Supabase Auth verification failed', { error: error.message });
+      logger.error("Supabase Auth verification failed", {
+        error: error.message,
+      });
       return false;
     }
 
     // Also verify Prisma connection
     const prismaConnected = await verifyPrismaConnection();
     if (!prismaConnected) {
-      logger.error('Prisma connection verification failed');
+      logger.error("Prisma connection verification failed");
       return false;
     }
 
-    logger.info('Supabase Auth and Prisma database verified');
+    logger.info("Supabase Auth and Prisma database verified");
     return true;
   } catch (error) {
-    logger.error('Supabase/Prisma connection verification error', { error });
+    logger.error("Supabase/Prisma connection verification error", { error });
     return false;
   }
 }

@@ -47,3 +47,6 @@ temp/
 
 # Supabase local
 .supabase/
+
+# Driftal CLI metadata and indexes
+.driftal

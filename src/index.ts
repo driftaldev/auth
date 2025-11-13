@@ -1,4 +1,4 @@
-// ScoutCLI Backend - Main entry point
+// driftal Backend - Main entry point
 
 import express, { Express } from "express";
 import cors from "cors";
@@ -119,7 +119,7 @@ app.use("/auth", authRoutes);
 // Root endpoint
 app.get("/", (req, res) => {
   res.json({
-    name: "ScoutCLI Backend",
+    name: "driftal Backend",
     version: "1.0.0",
     status: "running",
     endpoints: {
@@ -168,7 +168,7 @@ app.use(errorHandler);
 
 async function startServer() {
   try {
-    logger.info("Starting ScoutCLI Backend...");
+    logger.info("Starting driftal Backend...");
 
     // Initialize Prisma (database ORM)
     initializePrisma();
@@ -185,7 +185,7 @@ async function startServer() {
       logger.info(`✓ Health check: http://localhost:${config.port}/health`);
       logger.info(`✓ Web auth page: http://localhost:${config.port}/cli/auth`);
       logger.info("");
-      logger.info("🚀 ScoutCLI Backend is ready!");
+      logger.info("🚀 driftal Backend is ready!");
     });
   } catch (error) {
     logger.error("Failed to start server", { error });
