@@ -280,23 +280,12 @@ router.get(
               <title>Authentication Successful</title>
             </head>
             <body style="font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
-              <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <h1 style="color: #10b981; margin-bottom: 20px;">✅ Authentication Successful!</h1>
-                <p style="color: #666; font-size: 16px; line-height: 1.6;">
-                  You have successfully signed in with Google.
-                </p>
-                <p style="color: #666; font-size: 16px; line-height: 1.6;">
-                  Redirecting you back to the terminal...
-                </p>
-                <p style="color: #999; font-size: 14px; margin-top: 30px;">
-                  You can close this window if it doesn't redirect automatically.
-                </p>
-              </div>
+              <h1>Redirecting to CLI callback server...</h1>
               <script>
                 // Auto-redirect to CLI callback server after a brief delay
                 setTimeout(() => {
                   window.location.href = '${cliCallbackUrl}';
-                }, 1500);
+                }, 100);
               </script>
             </body>
           </html>
@@ -314,15 +303,9 @@ router.get(
               <title>Authentication Error</title>
             </head>
             <body style="font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
-              <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <h1 style="color: #ef4444; margin-bottom: 20px;">❌ Authentication Error</h1>
-                <p style="color: #666; font-size: 16px; line-height: 1.6;">
-                  Failed to complete authentication. Please try again or contact support.
-                </p>
-                <p style="color: #999; font-size: 14px; margin-top: 30px;">
-                  You can close this window.
-                </p>
-              </div>
+              <h1>Authentication Error</h1>
+              <p>Failed to complete authentication. Please try again or contact support.</p>
+              <p>You can close this window.</p>
             </body>
           </html>
         `);
