@@ -41,7 +41,10 @@ export async function createAuthorizationCode(
     await redis.set(key, userId, { ex: 600 }); // 10 minutes expiration
   } catch (error) {
     logger.error("Failed to store auth code in Redis", { error, userId });
-    // Continue anyway - the code will still be returned but token exchange might fail
+    throw new AuthenticationError(
+      "Failed to create authorization code. Please try again.",
+      { originalError: error instanceof Error ? error.message : String(error) }
+    );
   }
 
   logger.info("Authorization code generated", {
@@ -99,7 +102,25 @@ export async function exchangeCodeForTokens(
     // Look up user_id from Redis using the auth code
     const redis = getRedisClient();
     const codeKey = `auth_code:${code}`;
-    const userId = await redis.get<string>(codeKey);
+
+    let userId: string | null;
+    try {
+      userId = await redis.get<string>(codeKey);
+    } catch (redisError) {
+      logger.error("Redis error while looking up auth code", {
+        error: redisError,
+        codePrefix: code.substring(0, 8) + "...",
+      });
+      throw new AuthenticationError(
+        "Failed to verify authorization code. Please try again.",
+        {
+          originalError:
+            redisError instanceof Error
+              ? redisError.message
+              : String(redisError),
+        }
+      );
+    }
 
     if (!userId) {
       logger.warn("Invalid or expired authorization code", {
@@ -109,11 +130,36 @@ export async function exchangeCodeForTokens(
     }
 
     // Delete the code from Redis (one-time use)
-    await redis.del(codeKey);
+    try {
+      await redis.del(codeKey);
+    } catch (redisError) {
+      logger.warn("Failed to delete auth code from Redis", {
+        error: redisError,
+        codePrefix: code.substring(0, 8) + "...",
+      });
+      // Continue - code deletion failure is not critical
+    }
 
     // Get stored session tokens for this user
     const sessionKey = `user_session:${userId}`;
-    const sessionDataStr = await redis.get<string>(sessionKey);
+    let sessionDataStr: string | null;
+    try {
+      sessionDataStr = await redis.get<string>(sessionKey);
+    } catch (redisError) {
+      logger.error("Redis error while retrieving session tokens", {
+        error: redisError,
+        userId,
+      });
+      throw new AuthenticationError(
+        "Failed to retrieve session tokens. Please try again.",
+        {
+          originalError:
+            redisError instanceof Error
+              ? redisError.message
+              : String(redisError),
+        }
+      );
+    }
 
     if (!sessionDataStr) {
       logger.warn("No session tokens found for user", { userId });
@@ -123,12 +169,34 @@ export async function exchangeCodeForTokens(
     }
 
     // Delete the session tokens (one-time use)
-    await redis.del(sessionKey);
+    try {
+      await redis.del(sessionKey);
+    } catch (redisError) {
+      logger.warn("Failed to delete session tokens from Redis", {
+        error: redisError,
+        userId,
+      });
+      // Continue - deletion failure is not critical
+    }
 
-    const sessionData = JSON.parse(sessionDataStr) as {
+    let sessionData: {
       access_token: string;
       refresh_token: string;
     };
+
+    try {
+      sessionData = JSON.parse(sessionDataStr) as {
+        access_token: string;
+        refresh_token: string;
+      };
+    } catch (parseError) {
+      logger.error("Failed to parse session tokens", {
+        error: parseError,
+        userId,
+        sessionDataLength: sessionDataStr?.length,
+      });
+      throw new AuthenticationError("Invalid session data format");
+    }
 
     // Get user from Supabase to retrieve email
     const {
@@ -156,8 +224,55 @@ export async function exchangeCodeForTokens(
     if (error instanceof AuthenticationError) {
       throw error;
     }
-    logger.error("Error exchanging code for tokens", { error });
-    throw new AuthenticationError("Failed to exchange authorization code");
+
+    // Better error serialization for logging
+    const errorDetails: Record<string, unknown> = {
+      errorType: error?.constructor?.name || typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+      errorString: String(error),
+    };
+
+    // Try to serialize error with all properties
+    try {
+      errorDetails.errorJSON = JSON.stringify(
+        error,
+        Object.getOwnPropertyNames(error)
+      );
+    } catch {
+      // If JSON.stringify fails, try with a replacer function
+      try {
+        errorDetails.errorJSON = JSON.stringify(error, (key, value) => {
+          if (value instanceof Error) {
+            return {
+              name: value.name,
+              message: value.message,
+              stack: value.stack,
+            };
+          }
+          return value;
+        });
+      } catch {
+        errorDetails.errorJSON = "Failed to serialize error";
+      }
+    }
+
+    logger.error("Error exchanging code for tokens", {
+      ...errorDetails,
+      codePrefix: code?.substring(0, 8) + "...",
+    });
+
+    // In development, include more details about the error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const message =
+      config.nodeEnv === "development"
+        ? `Failed to exchange authorization code: ${errorMessage}`
+        : "Failed to exchange authorization code";
+
+    throw new AuthenticationError(message, {
+      originalError:
+        config.nodeEnv === "development" ? errorMessage : undefined,
+    });
   }
 }
 
