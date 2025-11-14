@@ -168,6 +168,23 @@ export async function exchangeCodeForTokens(
       );
     }
 
+    // Log what we retrieved from Redis for debugging
+    const sessionDataType = typeof sessionDataStr;
+    const sessionDataPreview =
+      typeof sessionDataStr === "string"
+        ? sessionDataStr.substring(0, 200)
+        : JSON.stringify(sessionDataStr).substring(0, 200);
+
+    logger.debug("Retrieved session data from Redis", {
+      userId,
+      sessionDataLength:
+        typeof sessionDataStr === "string"
+          ? sessionDataStr.length
+          : JSON.stringify(sessionDataStr).length,
+      sessionDataType,
+      sessionDataPreview,
+    });
+
     // Delete the session tokens (one-time use)
     try {
       await redis.del(sessionKey);
@@ -184,17 +201,63 @@ export async function exchangeCodeForTokens(
       refresh_token: string;
     };
 
+    // Handle case where Redis returns already-parsed object vs string
     try {
-      sessionData = JSON.parse(sessionDataStr) as {
-        access_token: string;
-        refresh_token: string;
-      };
+      if (typeof sessionDataStr === "string") {
+        // Parse string JSON
+        sessionData = JSON.parse(sessionDataStr) as {
+          access_token: string;
+          refresh_token: string;
+        };
+      } else if (
+        typeof sessionDataStr === "object" &&
+        sessionDataStr !== null
+      ) {
+        // Already an object, use it directly
+        sessionData = sessionDataStr as {
+          access_token: string;
+          refresh_token: string;
+        };
+      } else {
+        throw new Error(
+          `Unexpected session data type: ${typeof sessionDataStr}`
+        );
+      }
     } catch (parseError) {
-      logger.error("Failed to parse session tokens", {
-        error: parseError,
+      // Enhanced error logging for JSON parse failures
+      const parseErrorDetails: Record<string, unknown> = {
+        errorType: parseError?.constructor?.name || typeof parseError,
+        errorMessage:
+          parseError instanceof Error ? parseError.message : String(parseError),
+        errorStack: parseError instanceof Error ? parseError.stack : undefined,
         userId,
-        sessionDataLength: sessionDataStr?.length,
-      });
+        sessionDataType: typeof sessionDataStr,
+        sessionDataLength:
+          typeof sessionDataStr === "string"
+            ? sessionDataStr.length
+            : JSON.stringify(sessionDataStr).length,
+        sessionDataPreview:
+          typeof sessionDataStr === "string"
+            ? sessionDataStr.substring(0, 200)
+            : JSON.stringify(sessionDataStr).substring(0, 200),
+        sessionDataFull:
+          typeof sessionDataStr === "string"
+            ? sessionDataStr
+            : JSON.stringify(sessionDataStr),
+        sessionDataIsString: typeof sessionDataStr === "string",
+      };
+
+      // Try to serialize parse error
+      try {
+        parseErrorDetails.parseErrorJSON = JSON.stringify(
+          parseError,
+          Object.getOwnPropertyNames(parseError)
+        );
+      } catch {
+        parseErrorDetails.parseErrorJSON = "Failed to serialize parse error";
+      }
+
+      logger.error("Failed to parse session tokens", parseErrorDetails);
       throw new AuthenticationError("Invalid session data format");
     }
 
