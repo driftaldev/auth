@@ -51,6 +51,8 @@ const verifyOTPSchema = z.object({
 const googleOAuthCallbackSchema = z.object({
   query: z.object({
     code: z.string().min(1, 'OAuth code is required'),
+    state: z.string().optional(),
+    callback_port: z.string().optional(),
   }),
 });
 
@@ -234,27 +236,104 @@ router.get(
  * Query params:
  *   code: OAuth authorization code from Google
  *   state: CSRF token (optional)
+ *   callback_port: CLI callback server port (optional, indicates browser redirect)
  *
  * Response:
- *   {
- *     user_id: "uuid",
- *     email: "user@example.com"
- *   }
+ *   - If callback_port is present: HTML success page with auto-redirect to CLI
+ *   - Otherwise: JSON { user_id, email }
  */
 router.get(
   '/oauth/google/callback',
   validate({ query: googleOAuthCallbackSchema.shape.query }),
   asyncHandler(async (req: Request, res: Response) => {
-    const { code } = req.query;
+    const { code, state, callback_port } = req.query;
 
-    logger.info('Google OAuth callback received');
+    logger.info('Google OAuth callback received', { hasCallbackPort: !!callback_port });
 
     const result = await handleGoogleCallback(code as string);
 
-    res.json({
-      user_id: result.userId,
-      email: result.email,
-    });
+    // If callback_port is present, this is a direct browser redirect from Google
+    // Render HTML success page and redirect to CLI callback server
+    if (callback_port) {
+      try {
+        // Generate auth code for CLI
+        const authCode = await createAuthorizationCode(
+          result.userId,
+          (state as string) || 'default'
+        );
+
+        // Construct CLI callback URL
+        const cliCallbackUrl = `http://127.0.0.1:${callback_port}/callback?code=${authCode}&state=${state || ''}`;
+
+        logger.info('Redirecting to CLI callback server', {
+          port: callback_port,
+          userId: result.userId
+        });
+
+        // Render HTML success page with auto-redirect
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>Authentication Successful</title>
+            </head>
+            <body style="font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+              <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h1 style="color: #10b981; margin-bottom: 20px;">✅ Authentication Successful!</h1>
+                <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                  You have successfully signed in with Google.
+                </p>
+                <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                  Redirecting you back to the terminal...
+                </p>
+                <p style="color: #999; font-size: 14px; margin-top: 30px;">
+                  You can close this window if it doesn't redirect automatically.
+                </p>
+              </div>
+              <script>
+                // Auto-redirect to CLI callback server after a brief delay
+                setTimeout(() => {
+                  window.location.href = '${cliCallbackUrl}';
+                }, 1500);
+              </script>
+            </body>
+          </html>
+        `);
+      } catch (error) {
+        logger.error('Failed to generate auth code for CLI', { error, userId: result.userId });
+
+        // Render error page
+        res.setHeader('Content-Type', 'text/html');
+        res.status(500).send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>Authentication Error</title>
+            </head>
+            <body style="font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
+              <div style="max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h1 style="color: #ef4444; margin-bottom: 20px;">❌ Authentication Error</h1>
+                <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                  Failed to complete authentication. Please try again or contact support.
+                </p>
+                <p style="color: #999; font-size: 14px; margin-top: 30px;">
+                  You can close this window.
+                </p>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+    } else {
+      // Programmatic call (from auth.html) - return JSON
+      res.json({
+        user_id: result.userId,
+        email: result.email,
+      });
+    }
   })
 );
 
