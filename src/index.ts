@@ -131,7 +131,8 @@ app.get("/", (req, res) => {
         signin: "POST /auth/signin",
       },
       proxy: {
-        chat: "POST /v1/chat/completions",
+        chat: "POST /v1/chat/completions or POST /chat/completions",
+        reviews: "POST /v1/reviews",
         usage: "GET /v1/usage",
         models: "GET /v1/models",
         mossCredentials: "GET /v1/moss/credentials",

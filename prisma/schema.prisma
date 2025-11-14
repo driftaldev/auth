@@ -16,83 +16,86 @@ datasource db {
 // ============================================================================
 
 /// User profiles extending Supabase auth.users
-/// Stores model preferences for driftal
+/// Stores cached user data for easier querying
 model UserProfile {
   id             String   @id @db.Uuid // References auth.users(id)
-  primaryModel   String   @default("claude-3-5-sonnet-20241022") @map("primary_model") @db.VarChar(100)
-  fallbackModel  String?  @map("fallback_model") @db.VarChar(100)
+  email          String   @db.VarChar(255)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  authCodes      AuthCode[]
-  usageLogs      UsageLog[]
+  reviewLogs     ReviewLog[]
 
+  @@index([email])
   @@map("user_profiles")
 }
 
 // ============================================================================
-// Authorization Codes
+// Review Logs
 // ============================================================================
 
-/// OAuth authorization codes for CLI authentication flow
-/// Short-lived codes (10 minutes) for token exchange
-model AuthCode {
-  code       String   @id @db.VarChar(255)
-  userId     String   @map("user_id") @db.Uuid
-  state      String   @db.VarChar(255) // CSRF protection
-  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
-  used       Boolean  @default(false)
-  usedAt     DateTime? @map("used_at") @db.Timestamptz(6)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+/// Code review logs tracking complete review sessions
+/// Tracks review metadata, tokens used, and code metrics
+model ReviewLog {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String        @map("user_id") @db.Uuid
+  email                String        @db.VarChar(255)
+  model                String        @db.VarChar(100)
+  totalTokens          Int?          @map("total_tokens")
+  linesOfCodeReviewed  Int?          @map("lines_of_code_reviewed")
+  reviewDurationMs     Int?          @map("review_duration_ms")
+  repositoryName       String?       @map("repository_name") @db.VarChar(255)
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   // Relations
-  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@index([used])
-  @@index([state])
-  @@map("auth_codes")
-}
-
-// ============================================================================
-// Usage Logs
-// ============================================================================
-
-/// LLM API usage logs for analytics and monitoring
-/// Tracks all requests to Anthropic/OpenAI
-model UsageLog {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String   @map("user_id") @db.Uuid
-  model              String   @db.VarChar(100)
-  provider           String   @db.VarChar(50) // 'anthropic' or 'openai'
-  promptTokens       Int?     @map("prompt_tokens")
-  completionTokens   Int?     @map("completion_tokens")
-  totalTokens        Int?     @map("total_tokens")
-  requestDurationMs  Int?     @map("request_duration_ms")
-  status             Status   @default(success)
-  errorMessage       String?  @map("error_message") @db.Text
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  // Relations
-  user               UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issues               ReviewIssue[]
 
   @@index([userId])
   @@index([createdAt])
   @@index([model])
-  @@index([provider])
-  @@index([status])
+  @@index([email])
+  @@index([repositoryName])
+  @@index([email, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("usage_logs")
+}
+
+// ============================================================================
+// Review Issues
+// ============================================================================
+
+/// Individual issues found during code reviews
+/// Linked to review logs with severity levels
+model ReviewIssue {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reviewId     String      @map("review_id") @db.Uuid
+  title        String      @db.Text
+  severity     Severity
+  filePath     String      @map("file_path") @db.Text
+  lineNumber   Int?        @map("line_number")
+  description  String?     @db.Text
+  suggestion   String?     @db.Text
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  review       ReviewLog   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([severity])
+  @@index([filePath])
+  @@index([createdAt])
+  @@index([reviewId, severity])
+  @@map("review_issues")
 }
 
 // ============================================================================
 // Enums
 // ============================================================================
 
-enum Status {
-  success
-  error
-  rate_limited
+enum Severity {
+  critical
+  high
+  medium
+  low
 }

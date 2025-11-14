@@ -9,6 +9,7 @@ import {
   routeLLMStreamRequest,
   validateChatCompletionRequest,
   getUserUsageStats,
+  logReview,
 } from "../services/proxy.js";
 import { logger } from "../config/logger.js";
 import { config } from "../config/index.js";
@@ -24,7 +25,61 @@ router.use(verifyToken);
 // ============================================================================
 
 /**
+ * Chat completions handler (shared for both /v1/chat/completions and /chat/completions)
+ */
+const chatCompletionsHandler = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.userId!;
+
+  // Validate request body
+  validateChatCompletionRequest(req.body);
+
+  const chatRequest = req.body;
+  const isStreaming = chatRequest.stream === true;
+
+  logger.info("Chat completion request", {
+    userId,
+    model: chatRequest.model || "default",
+    streaming: isStreaming,
+    messageCount: chatRequest.messages.length,
+  });
+
+  if (isStreaming) {
+    // Handle streaming response with Server-Sent Events
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    try {
+      const stream = routeLLMStreamRequest(chatRequest, userId);
+
+      for await (const chunk of stream) {
+        // Send chunk as SSE data
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      }
+
+      // Send done signal
+      res.write("data: [DONE]\n\n");
+      res.end();
+    } catch (error) {
+      // Send error as SSE
+      res.write(
+        `data: ${JSON.stringify({
+          error: error instanceof Error ? error.message : "Unknown error",
+        })}\n\n`
+      );
+      res.end();
+    }
+  } else {
+    // Handle non-streaming response
+    const response = await routeLLMRequest(chatRequest, userId);
+    res.json(response);
+  }
+});
+
+/**
  * POST /v1/chat/completions
+ * POST /chat/completions (alias for compatibility with Mastra/Vercel AI SDK)
  * Proxy LLM requests to Anthropic or OpenAI based on user's selected model
  *
  * Headers:
@@ -61,59 +116,8 @@ router.use(verifyToken);
  * Response (streaming):
  *   Server-Sent Events (SSE) stream with data chunks
  */
-router.post(
-  "/v1/chat/completions",
-  llmRateLimiter,
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.userId!;
-
-    // Validate request body
-    validateChatCompletionRequest(req.body);
-
-    const chatRequest = req.body;
-    const isStreaming = chatRequest.stream === true;
-
-    logger.info("Chat completion request", {
-      userId,
-      model: chatRequest.model || "default",
-      streaming: isStreaming,
-      messageCount: chatRequest.messages.length,
-    });
-
-    if (isStreaming) {
-      // Handle streaming response with Server-Sent Events
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.flushHeaders();
-
-      try {
-        const stream = routeLLMStreamRequest(chatRequest, userId);
-
-        for await (const chunk of stream) {
-          // Send chunk as SSE data
-          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-        }
-
-        // Send done signal
-        res.write("data: [DONE]\n\n");
-        res.end();
-      } catch (error) {
-        // Send error as SSE
-        res.write(
-          `data: ${JSON.stringify({
-            error: error instanceof Error ? error.message : "Unknown error",
-          })}\n\n`
-        );
-        res.end();
-      }
-    } else {
-      // Handle non-streaming response
-      const response = await routeLLMRequest(chatRequest, userId);
-      res.json(response);
-    }
-  })
-);
+router.post("/v1/chat/completions", llmRateLimiter, chatCompletionsHandler);
+router.post("/chat/completions", llmRateLimiter, chatCompletionsHandler);
 
 /**
  * GET /v1/usage
@@ -147,17 +151,135 @@ router.get(
 
     if (!stats) {
       res.json({
-        total_requests: 0,
+        total_reviews: 0,
         total_tokens: 0,
-        total_prompt_tokens: 0,
-        total_completion_tokens: 0,
-        avg_tokens_per_request: 0,
+        total_lines_reviewed: 0,
+        avg_tokens_per_review: 0,
+        avg_lines_per_review: 0,
+        avg_duration_ms: 0,
         models_used: [],
+        repositories: [],
       });
       return;
     }
 
     res.json(stats);
+  })
+);
+
+/**
+ * POST /v1/reviews
+ * Log a completed code review with metadata and issues
+ *
+ * Headers:
+ *   Authorization: Bearer <access_token>
+ *
+ * Request body:
+ *   {
+ *     email: "user@example.com",
+ *     model: "claude-3-5-sonnet-20241022",
+ *     total_tokens: 15000,
+ *     lines_of_code_reviewed: 450,
+ *     review_duration_ms: 32000,
+ *     repository_name: "my-repo" (optional),
+ *     issues: [
+ *       {
+ *         title: "Potential SQL injection vulnerability",
+ *         severity: "critical",
+ *         file_path: "src/database/queries.ts",
+ *         line_number: 42,
+ *         description: "User input is directly concatenated...",
+ *         suggestion: "Use parameterized queries..."
+ *       }
+ *     ]
+ *   }
+ *
+ * Response:
+ *   {
+ *     review_id: "uuid",
+ *     issues_created: 5,
+ *     message: "Review logged successfully"
+ *   }
+ */
+router.post(
+  "/v1/reviews",
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.userId!;
+    const {
+      email,
+      model,
+      total_tokens,
+      lines_of_code_reviewed,
+      review_duration_ms,
+      repository_name,
+      issues = [],
+    } = req.body;
+
+    // Validate required fields
+    if (!email || !model || total_tokens === undefined ||
+        lines_of_code_reviewed === undefined || review_duration_ms === undefined) {
+      res.status(400).json({
+        error: "Missing required fields: email, model, total_tokens, lines_of_code_reviewed, review_duration_ms",
+      });
+      return;
+    }
+
+    // Validate issue structure
+    if (!Array.isArray(issues)) {
+      res.status(400).json({
+        error: "issues must be an array",
+      });
+      return;
+    }
+
+    for (const issue of issues) {
+      if (!issue.title || !issue.severity || !issue.file_path) {
+        res.status(400).json({
+          error: "Each issue must have title, severity, and file_path",
+        });
+        return;
+      }
+      if (!['critical', 'high', 'medium', 'low'].includes(issue.severity)) {
+        res.status(400).json({
+          error: "Issue severity must be critical, high, medium, or low",
+        });
+        return;
+      }
+    }
+
+    logger.info("Review logging request", {
+      userId,
+      email,
+      model,
+      totalTokens: total_tokens,
+      linesReviewed: lines_of_code_reviewed,
+      issuesCount: issues.length,
+      repository: repository_name,
+    });
+
+    try {
+      const result = await logReview(
+        userId,
+        email,
+        model,
+        total_tokens,
+        lines_of_code_reviewed,
+        review_duration_ms,
+        repository_name || null,
+        issues
+      );
+
+      res.status(201).json({
+        review_id: result.reviewId,
+        issues_created: result.issuesCreated,
+        message: "Review logged successfully",
+      });
+    } catch (error) {
+      logger.error("Failed to log review", { error, userId });
+      res.status(500).json({
+        error: "Failed to log review",
+      });
+    }
   })
 );
 

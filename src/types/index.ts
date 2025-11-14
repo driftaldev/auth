@@ -9,34 +9,47 @@ import { User } from "@supabase/supabase-js";
 
 export interface UserProfile {
   id: string;
-  primary_model: string;
-  fallback_model: string | null;
+  email: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface AuthCode {
-  code: string;
+export interface ReviewLog {
+  id: string;
   user_id: string;
-  state: string;
-  expires_at: string;
-  used: boolean;
-  used_at: string | null;
+  email: string;
+  model: string;
+  total_tokens: number | null;
+  lines_of_code_reviewed: number | null;
+  review_duration_ms: number | null;
+  repository_name: string | null;
   created_at: string;
 }
 
-export interface UsageLog {
+export type Severity = "critical" | "high" | "medium" | "low";
+
+export interface ReviewIssue {
   id: string;
-  user_id: string;
-  model: string;
-  provider: string;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_tokens: number | null;
-  request_duration_ms: number | null;
-  status: "success" | "error" | "rate_limited";
-  error_message: string | null;
+  review_id: string;
+  title: string;
+  severity: Severity;
+  file_path: string;
+  line_number: number | null;
+  description: string | null;
+  suggestion: string | null;
   created_at: string;
+}
+
+// Usage stats from database function
+export interface UsageStats {
+  total_reviews: number;
+  total_tokens: number;
+  total_lines_reviewed: number;
+  avg_tokens_per_review: number;
+  avg_lines_per_review: number;
+  avg_duration_ms: number;
+  models_used: string[];
+  repositories: string[];
 }
 
 // ============================================================================
@@ -63,6 +76,42 @@ export interface TokenRefreshResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+}
+
+// Code Review Logging
+export interface CreateReviewRequest {
+  email: string;
+  model: string;
+  total_tokens: number;
+  lines_of_code_reviewed: number;
+  review_duration_ms: number;
+  repository_name?: string;
+  issues: Array<{
+    title: string;
+    severity: Severity;
+    file_path: string;
+    line_number?: number;
+    description?: string;
+    suggestion?: string;
+  }>;
+}
+
+export interface CreateReviewResponse {
+  review_id: string;
+  issues_created: number;
+  message: string;
+}
+
+export interface GetReviewResponse {
+  review: ReviewLog;
+  issues: ReviewIssue[];
+  issue_summary: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
 }
 
 // LLM Chat Completions

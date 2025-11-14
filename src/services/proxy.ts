@@ -31,26 +31,15 @@ export function getProviderForModel(model: string): LLMProvider {
 }
 
 /**
- * Get user's selected model from database using Prisma
+ * Get user's selected model (now returns default since preferences moved to CLI config)
+ * Model preferences are now stored locally in ~/.driftal/config.json on the CLI side
+ * The CLI should always provide the model in the request instead of relying on this function
  */
 export async function getUserModel(userId: string): Promise<string> {
-  try {
-    const profile = await prisma.userProfile.findUnique({
-      where: { id: userId },
-      select: { primaryModel: true, fallbackModel: true },
-    });
-
-    if (!profile) {
-      logger.warn('Failed to get user model preferences', { userId });
-      // Default to Claude 3.5 Sonnet
-      return 'claude-3-5-sonnet-20241022';
-    }
-
-    return profile.primaryModel;
-  } catch (error) {
-    logger.error('Error getting user model', { userId, error });
-    return 'claude-3-5-sonnet-20241022';
-  }
+  logger.info('getUserModel called - returning default model (preferences now in CLI config)', { userId });
+  // Default to Claude 3.5 Sonnet
+  // The CLI should always provide the model explicitly in requests
+  return 'claude-3-5-sonnet-20241022';
 }
 
 /**
@@ -183,6 +172,9 @@ export async function* routeLLMStreamRequest(
 
 /**
  * Log usage to database using Prisma
+ * NOTE: Individual LLM request logging is currently disabled.
+ * The usage_logs table was transformed to track complete reviews instead.
+ * Individual request tracking may be re-enabled in the future if needed.
  */
 async function logUsage(
   userId: string,
@@ -193,58 +185,136 @@ async function logUsage(
   status: 'success' | 'error' | 'rate_limited',
   errorMessage?: string
 ): Promise<void> {
+  // Individual LLM request logging is disabled - only complete reviews are logged
+  // This function is kept for API compatibility but does not write to database
+  logger.debug('Individual LLM request usage logging is disabled - only complete reviews are tracked', {
+    userId,
+    model,
+    provider,
+    totalTokens: usage?.total_tokens || 0,
+  });
+}
+
+/**
+ * Log a complete code review to database
+ */
+export async function logReview(
+  userId: string,
+  email: string,
+  model: string,
+  totalTokens: number,
+  linesOfCodeReviewed: number,
+  reviewDurationMs: number,
+  repositoryName: string | null,
+  issues: Array<{
+    title: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    file_path: string;
+    line_number?: number;
+    description?: string;
+    suggestion?: string;
+  }>
+): Promise<{ reviewId: string; issuesCreated: number }> {
   try {
-    await prisma.usageLog.create({
-      data: {
-        userId,
-        model,
-        provider,
-        promptTokens: usage?.prompt_tokens || null,
-        completionTokens: usage?.completion_tokens || null,
-        totalTokens: usage?.total_tokens || null,
-        requestDurationMs: duration,
-        status,
-        errorMessage: errorMessage || null,
+    // Ensure UserProfile exists before creating ReviewLog (foreign key constraint)
+    await prisma.userProfile.upsert({
+      where: { id: userId },
+      create: {
+        id: userId,
+        email,
+      },
+      update: {
+        email,
       },
     });
+
+    // Create review log and issues in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the review log
+      const reviewLog = await tx.reviewLog.create({
+        data: {
+          userId,
+          email,
+          model,
+          totalTokens,
+          linesOfCodeReviewed,
+          reviewDurationMs,
+          repositoryName,
+        },
+      });
+
+      // Create all issues for this review
+      if (issues.length > 0) {
+        await tx.reviewIssue.createMany({
+          data: issues.map((issue) => ({
+            reviewId: reviewLog.id,
+            title: issue.title,
+            severity: issue.severity,
+            filePath: issue.file_path,
+            lineNumber: issue.line_number || null,
+            description: issue.description || null,
+            suggestion: issue.suggestion || null,
+          })),
+        });
+      }
+
+      return {
+        reviewId: reviewLog.id,
+        issuesCreated: issues.length,
+      };
+    });
+
+    logger.info('Review logged successfully', {
+      reviewId: result.reviewId,
+      userId,
+      email,
+      issuesCount: result.issuesCreated,
+    });
+
+    return result;
   } catch (error) {
-    logger.error('Error logging usage', { error, userId, model });
+    logger.error('Error logging review', { error, userId, email });
+    throw error;
   }
 }
 
 /**
- * Get user usage statistics using Prisma
+ * Get user review statistics using Prisma
  */
 export async function getUserUsageStats(userId: string, days: number = 30) {
   try {
     const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    // Get usage logs for the user within the time period
-    const logs = await prisma.usageLog.findMany({
+    // Get review logs for the user within the time period
+    const logs = await prisma.reviewLog.findMany({
       where: {
         userId,
         createdAt: {
           gte: sinceDate,
         },
-        status: 'success',
       },
     });
 
     // Calculate statistics
-    const totalRequests = logs.length;
+    const totalReviews = logs.length;
     const totalTokens = logs.reduce((sum, log) => sum + (log.totalTokens || 0), 0);
-    const totalPromptTokens = logs.reduce((sum, log) => sum + (log.promptTokens || 0), 0);
-    const totalCompletionTokens = logs.reduce((sum, log) => sum + (log.completionTokens || 0), 0);
-    const avgTokensPerRequest = totalRequests > 0 ? totalTokens / totalRequests : 0;
+    const totalLinesReviewed = logs.reduce((sum, log) => sum + (log.linesOfCodeReviewed || 0), 0);
+    const totalDurationMs = logs.reduce((sum, log) => sum + (log.reviewDurationMs || 0), 0);
+    const avgTokensPerReview = totalReviews > 0 ? totalTokens / totalReviews : 0;
+    const avgLinesPerReview = totalReviews > 0 ? totalLinesReviewed / totalReviews : 0;
+    const avgDurationMs = totalReviews > 0 ? totalDurationMs / totalReviews : 0;
     const modelsUsed = [...new Set(logs.map(log => log.model))];
+    const repositories = [...new Set(logs.map(log => log.repositoryName).filter(Boolean))];
 
     return {
-      total_requests: totalRequests,
+      total_reviews: totalReviews,
       total_tokens: totalTokens,
-      total_prompt_tokens: totalPromptTokens,
-      total_completion_tokens: totalCompletionTokens,
-      avg_tokens_per_request: Math.round(avgTokensPerRequest * 100) / 100,
+      total_lines_reviewed: totalLinesReviewed,
+      avg_tokens_per_review: Math.round(avgTokensPerReview * 100) / 100,
+      avg_lines_per_review: Math.round(avgLinesPerReview * 100) / 100,
+      avg_duration_ms: Math.round(avgDurationMs * 100) / 100,
       models_used: modelsUsed,
+      repositories: repositories as string[],
     };
   } catch (error) {
     logger.error('Error getting usage stats', { error, userId });

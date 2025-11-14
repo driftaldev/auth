@@ -22,148 +22,41 @@ export function generateAuthCode(): string {
 }
 
 /**
- * Generate authorization code and store in database using Prisma
- * Called from the web authentication page after successful login
+ * DEPRECATED: Auth codes are now stored locally in CLI (~/.driftal directory)
+ * This function has been removed as part of schema migration
  */
-export async function createAuthorizationCode(
-  userId: string,
-  state: string
-): Promise<string> {
-  try {
-    const code = generateAuthCode();
-    const expiresAt = new Date(
-      Date.now() + config.authCodeExpiryMinutes * 60 * 1000
-    );
-
-    // Store auth code in database using Prisma
-    await prisma.authCode.create({
-      data: {
-        code,
-        userId,
-        state,
-        expiresAt,
-        used: false,
-      },
-    });
-
-    logger.info('Authorization code created', { userId, state });
-    return code;
-  } catch (error) {
-    logger.error('Error creating authorization code', { error, userId });
-    throw error;
-  }
-}
+// export async function createAuthorizationCode(
+//   userId: string,
+//   state: string
+// ): Promise<string> {
+//   // Auth codes now handled client-side
+//   throw new Error('Auth codes are now managed locally in CLI');
+// }
 
 /**
- * Validate and consume authorization code using Prisma
- * Returns user ID if valid, throws error if invalid
+ * DEPRECATED: Auth code validation moved to client-side
+ * This function has been removed as part of schema migration
  */
-export async function validateAuthorizationCode(
-  code: string
-): Promise<{ userId: string; state: string }> {
-  try {
-    // Fetch auth code from database using Prisma
-    const authCode = await prisma.authCode.findUnique({
-      where: { code },
-    });
-
-    if (!authCode) {
-      logger.warn('Invalid authorization code', { code: code.substring(0, 8) + '...' });
-      throw new AuthenticationError('Invalid authorization code');
-    }
-
-    // Check if already used
-    if (authCode.used) {
-      logger.warn('Authorization code already used', { code: code.substring(0, 8) + '...' });
-      throw new AuthenticationError('Authorization code has already been used');
-    }
-
-    // Check if expired
-    if (authCode.expiresAt < new Date()) {
-      logger.warn('Authorization code expired', { code: code.substring(0, 8) + '...' });
-      throw new AuthenticationError('Authorization code has expired');
-    }
-
-    // Mark as used using Prisma
-    await prisma.authCode.update({
-      where: { code },
-      data: {
-        used: true,
-        usedAt: new Date(),
-      },
-    });
-
-    logger.info('Authorization code validated', { userId: authCode.userId });
-
-    return {
-      userId: authCode.userId,
-      state: authCode.state,
-    };
-  } catch (error) {
-    if (error instanceof AuthenticationError) {
-      throw error;
-    }
-    logger.error('Error validating authorization code', { error });
-    throw new AuthenticationError('Failed to validate authorization code');
-  }
-}
+// export async function validateAuthorizationCode(
+//   code: string
+// ): Promise<{ userId: string; state: string }> {
+//   // Auth codes now handled client-side
+//   throw new Error('Auth code validation is now managed locally in CLI');
+// }
 
 /**
- * Exchange authorization code for access and refresh tokens
- * This creates a new Supabase session for the user
+ * DEPRECATED: Token exchange flow changed with local auth code storage
+ * Auth codes are now validated client-side in CLI
+ * TODO: Implement new authentication flow for CLI
  */
 export async function exchangeCodeForTokens(
   code: string
 ): Promise<TokenExchangeResponse> {
-  try {
-    // Validate the authorization code using Prisma
-    const { userId } = await validateAuthorizationCode(code);
+  // This function needs to be reimplemented for the new auth flow
+  // where auth codes are stored locally in the CLI
+  throw new Error('Token exchange endpoint deprecated - auth codes now handled locally in CLI');
 
-    // Get user from Supabase auth
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.admin.getUserById(userId);
-
-    if (userError || !user) {
-      logger.error('Failed to get user', { error: userError, userId });
-      throw new AuthenticationError('User not found');
-    }
-
-    // Create a new session for the user using admin API
-    // This generates new access and refresh tokens
-    const { data, error } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: user.email!,
-    });
-
-    if (error) {
-      logger.error('Failed to generate session tokens', { error, userId });
-      throw new AuthenticationError('Failed to generate tokens');
-    }
-
-    // Get or create user profile using Prisma
-    const profile = await prisma.userProfile.findUnique({
-      where: { id: userId },
-    });
-
-    logAuthentication('token_exchange', userId, true);
-
-    // Return mock tokens for now
-    // TODO: Implement proper Supabase session creation
-    return {
-      access_token: `supabase_jwt_${userId}_${Date.now()}`, // Placeholder
-      refresh_token: `refresh_${userId}_${Date.now()}`, // Placeholder
-      expires_in: config.jwtExpirySeconds,
-      user_email: user.email!,
-    };
-  } catch (error) {
-    if (error instanceof AuthenticationError) {
-      throw error;
-    }
-    logger.error('Error exchanging code for tokens', { error });
-    throw new AuthenticationError('Failed to exchange code for tokens');
-  }
+  // Previous implementation removed - validateAuthorizationCode no longer exists
 }
 
 /**
@@ -268,10 +161,11 @@ export async function verifyOTP(
         where: { id: user.id },
         create: {
           id: user.id,
-          primaryModel: 'claude-3-5-sonnet-20241022',
-          fallbackModel: null,
+          email: user.email!,
         },
-        update: {},
+        update: {
+          email: user.email!,
+        },
       });
     } catch (profileError) {
       logger.warn('Failed to create/update user profile', { error: profileError, userId: user.id });
@@ -367,10 +261,11 @@ export async function handleGoogleCallback(
         where: { id: user.id },
         create: {
           id: user.id,
-          primaryModel: 'claude-3-5-sonnet-20241022',
-          fallbackModel: null,
+          email: user.email!,
         },
-        update: {},
+        update: {
+          email: user.email!,
+        },
       });
     } catch (profileError) {
       logger.warn('Failed to create/update user profile', { error: profileError, userId: user.id });
@@ -413,7 +308,8 @@ export async function getUserProfile(userId: string) {
 }
 
 /**
- * Update user model preferences using Prisma
+ * DEPRECATED: Model preferences are now stored locally in CLI config (~/.driftal/config.json)
+ * This function has been removed as part of schema migration
  */
 const DEFAULT_PRIMARY_MODEL = 'claude-3-5-sonnet-20241022';
 
@@ -422,57 +318,19 @@ export async function updateUserModelPreferences(
   primaryModel?: string,
   fallbackModel?: string | null
 ) {
-  try {
-    const updateData: Prisma.UserProfileUpdateInput = {};
-    if (primaryModel) {
-      updateData.primaryModel = primaryModel;
-    }
-    if (fallbackModel !== undefined) {
-      updateData.fallbackModel = fallbackModel;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      logger.warn('No model preference fields provided for update', { userId });
-      return;
-    }
-
-    const createData: Prisma.UserProfileCreateInput = {
-      id: userId,
-      primaryModel: primaryModel || DEFAULT_PRIMARY_MODEL,
-    };
-
-    if (fallbackModel !== undefined) {
-      createData.fallbackModel = fallbackModel;
-    }
-
-    await prisma.userProfile.upsert({
-      where: { id: userId },
-      update: updateData,
-      create: createData,
-    });
-
-    logger.info('Model preferences upserted', { userId, primaryModel, fallbackModel });
-  } catch (error) {
-    logger.error('Error updating model preferences', { error, userId });
-    throw error;
-  }
+  // Model preferences now managed client-side in CLI config
+  logger.warn('Model preferences endpoint deprecated - preferences now stored in CLI config', {
+    userId,
+    primaryModel,
+    fallbackModel
+  });
+  throw new Error('Model preferences are now managed locally in CLI config (~/.driftal/config.json)');
 }
 
 /**
- * Clean up expired authorization codes using Prisma
+ * DEPRECATED: Auth code cleanup no longer needed (codes stored locally in CLI)
+ * This function has been removed as part of schema migration
  */
-export async function cleanupExpiredAuthCodes(): Promise<void> {
-  try {
-    const result = await prisma.authCode.deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-        },
-      },
-    });
-
-    logger.info('Expired auth codes cleaned up', { count: result.count });
-  } catch (error) {
-    logger.error('Error cleaning up expired auth codes', { error });
-  }
-}
+// export async function cleanupExpiredAuthCodes(): Promise<void> {
+//   // Auth codes now handled client-side, no cleanup needed
+// }
