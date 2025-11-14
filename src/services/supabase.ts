@@ -97,8 +97,10 @@ export function initializeSupabase(): SupabaseClient<Database> {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
-          detectSessionInUrl: false,
+          detectSessionInUrl: true,
+          flowType: "pkce",
         },
+
         global: {
           headers: {
             "X-Client-Info": "driftal-backend",
