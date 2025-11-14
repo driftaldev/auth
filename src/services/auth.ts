@@ -304,6 +304,14 @@ export async function initiateGoogleOAuth(
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        // Force authorization code flow instead of implicit flow
+        // This ensures Google returns a code parameter instead of tokens in URL fragment
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+        // Skip browser redirect since we're on the server and will return the URL
+        skipBrowserRedirect: true,
       },
     });
 
