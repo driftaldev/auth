@@ -264,7 +264,8 @@ export async function verifyOTP(
         where: { id: user.id },
         create: {
           id: user.id,
-        },
+          email: user.email!,
+        } as Prisma.UserProfileCreateInput,
         update: {},
       });
     } catch (profileError) {
@@ -372,7 +373,8 @@ export async function handleGoogleCallback(
         where: { id: user.id },
         create: {
           id: user.id,
-        },
+          email: user.email!,
+        } as Prisma.UserProfileCreateInput,
         update: {},
       });
     } catch (profileError) {
