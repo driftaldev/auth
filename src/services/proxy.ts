@@ -1,10 +1,13 @@
 // LLM proxy service with model routing and usage tracking
 // Uses Prisma ORM for database operations
 
-import { prisma } from './prisma.js';
-import { makeAnthropicRequest, makeAnthropicStreamRequest } from './anthropic.js';
-import { makeOpenAIRequest, makeOpenAIStreamRequest } from './openai.js';
-import { logger } from '../config/logger.js';
+import { prisma } from "./prisma.js";
+import {
+  makeAnthropicRequest,
+  makeAnthropicStreamRequest,
+} from "./anthropic.js";
+import { makeOpenAIRequest, makeOpenAIStreamRequest } from "./openai.js";
+import { logger } from "../config/logger.js";
 import {
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -13,7 +16,21 @@ import {
   LLMProvider,
   ValidationError,
   NotFoundError,
-} from '../types/index.js';
+} from "../types/index.js";
+
+function mapToActualModelName(modelId: string, provider: LLMProvider): string {
+  const modelMappings: Record<string, string> = {
+    "gpt-5.1": "gpt-5",
+    "gpt-5.1-codex": "gpt-5-codex",
+    "gpt-5-codex": "gpt-5-codex",
+    "o4-mini": "o4-mini",
+    "o3-mini": "o3-mini",
+    "gpt-5.1-codex-mini": "gpt-5-mini",
+    o3: "o3",
+  };
+
+  return modelMappings[modelId] || modelId;
+}
 
 /**
  * Get provider for a given model
@@ -36,10 +53,13 @@ export function getProviderForModel(model: string): LLMProvider {
  * The CLI should always provide the model in the request instead of relying on this function
  */
 export async function getUserModel(userId: string): Promise<string> {
-  logger.info('getUserModel called - returning default model (preferences now in CLI config)', { userId });
+  logger.info(
+    "getUserModel called - returning default model (preferences now in CLI config)",
+    { userId }
+  );
   // Default to Claude 3.5 Sonnet
   // The CLI should always provide the model explicitly in requests
-  return 'claude-3-5-sonnet-20241022';
+  return "claude-3-5-sonnet-20241022";
 }
 
 /**
@@ -70,15 +90,23 @@ export async function routeLLMRequest(
 
     const provider = getProviderForModel(model);
 
-    logger.info('Routing LLM request', { model, provider, userId });
+    // Map custom model ID to actual API model name
+    const actualModelName = mapToActualModelName(model, provider);
+
+    logger.info("Routing LLM request", {
+      model,
+      actualModelName,
+      provider,
+      userId,
+    });
 
     // Route to appropriate provider
     let response: ChatCompletionResponse;
 
-    if (provider === 'anthropic') {
-      response = await makeAnthropicRequest(request, model, userId);
-    } else if (provider === 'openai') {
-      response = await makeOpenAIRequest(request, model, userId);
+    if (provider === "anthropic") {
+      response = await makeAnthropicRequest(request, actualModelName, userId);
+    } else if (provider === "openai") {
+      response = await makeOpenAIRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -86,7 +114,14 @@ export async function routeLLMRequest(
     const duration = Date.now() - startTime;
 
     // Log usage to database
-    await logUsage(userId, model, provider, response.usage, duration, 'success');
+    await logUsage(
+      userId,
+      model,
+      provider,
+      response.usage,
+      duration,
+      "success"
+    );
 
     return response;
   } catch (error) {
@@ -95,12 +130,12 @@ export async function routeLLMRequest(
     // Log failed request
     await logUsage(
       userId,
-      request.model || 'unknown',
-      'unknown',
+      request.model || "unknown",
+      "unknown",
       null,
       duration,
-      'error',
-      error instanceof Error ? error.message : 'Unknown error'
+      "error",
+      error instanceof Error ? error.message : "Unknown error"
     );
 
     throw error;
@@ -136,13 +171,21 @@ export async function* routeLLMStreamRequest(
 
     provider = getProviderForModel(model);
 
-    logger.info('Routing streaming LLM request', { model, provider, userId });
+    // Map custom model ID to actual API model name
+    const actualModelName = mapToActualModelName(model, provider);
+
+    logger.info("Routing streaming LLM request", {
+      model,
+      actualModelName,
+      provider,
+      userId,
+    });
 
     // Route to appropriate provider
-    if (provider === 'anthropic') {
-      yield* makeAnthropicStreamRequest(request, model, userId);
-    } else if (provider === 'openai') {
-      yield* makeOpenAIStreamRequest(request, model, userId);
+    if (provider === "anthropic") {
+      yield* makeAnthropicStreamRequest(request, actualModelName, userId);
+    } else if (provider === "openai") {
+      yield* makeOpenAIStreamRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -151,19 +194,19 @@ export async function* routeLLMStreamRequest(
 
     // Log successful streaming request
     // Note: Token usage is logged within the provider-specific functions
-    await logUsage(userId, model, provider, null, duration, 'success');
+    await logUsage(userId, model, provider, null, duration, "success");
   } catch (error) {
     const duration = Date.now() - startTime;
 
     // Log failed request
     await logUsage(
       userId,
-      request.model || 'unknown',
-      'unknown',
+      request.model || "unknown",
+      "unknown",
       null,
       duration,
-      'error',
-      error instanceof Error ? error.message : 'Unknown error'
+      "error",
+      error instanceof Error ? error.message : "Unknown error"
     );
 
     throw error;
@@ -180,19 +223,26 @@ async function logUsage(
   userId: string,
   model: string,
   provider: string,
-  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null,
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  } | null,
   duration: number,
-  status: 'success' | 'error' | 'rate_limited',
+  status: "success" | "error" | "rate_limited",
   errorMessage?: string
 ): Promise<void> {
   // Individual LLM request logging is disabled - only complete reviews are logged
   // This function is kept for API compatibility but does not write to database
-  logger.debug('Individual LLM request usage logging is disabled - only complete reviews are tracked', {
-    userId,
-    model,
-    provider,
-    totalTokens: usage?.total_tokens || 0,
-  });
+  logger.debug(
+    "Individual LLM request usage logging is disabled - only complete reviews are tracked",
+    {
+      userId,
+      model,
+      provider,
+      totalTokens: usage?.total_tokens || 0,
+    }
+  );
 }
 
 /**
@@ -208,7 +258,7 @@ export async function logReview(
   repositoryName: string | null,
   issues: Array<{
     title: string;
-    severity: 'critical' | 'high' | 'medium' | 'low';
+    severity: "critical" | "high" | "medium" | "low";
     file_path: string;
     line_number?: number;
     description?: string;
@@ -264,7 +314,7 @@ export async function logReview(
       };
     });
 
-    logger.info('Review logged successfully', {
+    logger.info("Review logged successfully", {
       reviewId: result.reviewId,
       userId,
       email,
@@ -273,7 +323,7 @@ export async function logReview(
 
     return result;
   } catch (error) {
-    logger.error('Error logging review', { error, userId, email });
+    logger.error("Error logging review", { error, userId, email });
     throw error;
   }
 }
@@ -297,14 +347,27 @@ export async function getUserUsageStats(userId: string, days: number = 30) {
 
     // Calculate statistics
     const totalReviews = logs.length;
-    const totalTokens = logs.reduce((sum, log) => sum + (log.totalTokens || 0), 0);
-    const totalLinesReviewed = logs.reduce((sum, log) => sum + (log.linesOfCodeReviewed || 0), 0);
-    const totalDurationMs = logs.reduce((sum, log) => sum + (log.reviewDurationMs || 0), 0);
-    const avgTokensPerReview = totalReviews > 0 ? totalTokens / totalReviews : 0;
-    const avgLinesPerReview = totalReviews > 0 ? totalLinesReviewed / totalReviews : 0;
+    const totalTokens = logs.reduce(
+      (sum, log) => sum + (log.totalTokens || 0),
+      0
+    );
+    const totalLinesReviewed = logs.reduce(
+      (sum, log) => sum + (log.linesOfCodeReviewed || 0),
+      0
+    );
+    const totalDurationMs = logs.reduce(
+      (sum, log) => sum + (log.reviewDurationMs || 0),
+      0
+    );
+    const avgTokensPerReview =
+      totalReviews > 0 ? totalTokens / totalReviews : 0;
+    const avgLinesPerReview =
+      totalReviews > 0 ? totalLinesReviewed / totalReviews : 0;
     const avgDurationMs = totalReviews > 0 ? totalDurationMs / totalReviews : 0;
-    const modelsUsed = [...new Set(logs.map(log => log.model))];
-    const repositories = [...new Set(logs.map(log => log.repositoryName).filter(Boolean))];
+    const modelsUsed = [...new Set(logs.map((log) => log.model))];
+    const repositories = [
+      ...new Set(logs.map((log) => log.repositoryName).filter(Boolean)),
+    ];
 
     return {
       total_reviews: totalReviews,
@@ -317,7 +380,7 @@ export async function getUserUsageStats(userId: string, days: number = 30) {
       repositories: repositories as string[],
     };
   } catch (error) {
-    logger.error('Error getting usage stats', { error, userId });
+    logger.error("Error getting usage stats", { error, userId });
     return null;
   }
 }
@@ -329,48 +392,57 @@ export function validateChatCompletionRequest(
   request: any
 ): asserts request is ChatCompletionRequest {
   if (!request.messages || !Array.isArray(request.messages)) {
-    throw new ValidationError('messages field is required and must be an array');
+    throw new ValidationError(
+      "messages field is required and must be an array"
+    );
   }
 
   if (request.messages.length === 0) {
-    throw new ValidationError('messages array cannot be empty');
+    throw new ValidationError("messages array cannot be empty");
   }
 
   // Validate each message
   for (const message of request.messages) {
-    if (!message.role || !['system', 'user', 'assistant'].includes(message.role)) {
+    if (
+      !message.role ||
+      !["system", "user", "assistant"].includes(message.role)
+    ) {
       throw new ValidationError(
-        'Each message must have a role of system, user, or assistant'
+        "Each message must have a role of system, user, or assistant"
       );
     }
 
-    if (typeof message.content !== 'string') {
-      throw new ValidationError('Each message must have a content string');
+    if (typeof message.content !== "string") {
+      throw new ValidationError("Each message must have a content string");
     }
   }
 
   // Validate optional fields
   if (request.temperature !== undefined) {
-    if (typeof request.temperature !== 'number' || request.temperature < 0 || request.temperature > 2) {
-      throw new ValidationError('temperature must be a number between 0 and 2');
+    if (
+      typeof request.temperature !== "number" ||
+      request.temperature < 0 ||
+      request.temperature > 2
+    ) {
+      throw new ValidationError("temperature must be a number between 0 and 2");
     }
   }
 
   if (request.max_tokens !== undefined) {
-    if (typeof request.max_tokens !== 'number' || request.max_tokens < 1) {
-      throw new ValidationError('max_tokens must be a positive number');
+    if (typeof request.max_tokens !== "number" || request.max_tokens < 1) {
+      throw new ValidationError("max_tokens must be a positive number");
     }
   }
 
   if (request.stream !== undefined) {
-    if (typeof request.stream !== 'boolean') {
-      throw new ValidationError('stream must be a boolean');
+    if (typeof request.stream !== "boolean") {
+      throw new ValidationError("stream must be a boolean");
     }
   }
 
   if (request.model !== undefined) {
-    if (typeof request.model !== 'string') {
-      throw new ValidationError('model must be a string');
+    if (typeof request.model !== "string") {
+      throw new ValidationError("model must be a string");
     }
   }
 }
