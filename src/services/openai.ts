@@ -1,18 +1,35 @@
 // OpenAI API service with request/response transformation
 
-import OpenAI from 'openai';
-import { config } from '../config/index.js';
-import { logger, logLLMRequest } from '../config/logger.js';
+import OpenAI from "openai";
+import { config } from "../config/index.js";
+import { logger, logLLMRequest } from "../config/logger.js";
 import {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatCompletionChunk,
   ProviderError,
-} from '../types/index.js';
-import {
-  getEndpointType,
-  applyParameterConstraints,
-} from './model-config.js';
+} from "../types/index.js";
+import { getEndpointType, applyParameterConstraints } from "./model-config.js";
+
+// Type for OpenAI /v1/responses endpoint response
+interface OpenAIResponsesResponse {
+  id?: string;
+  created?: number;
+  model?: string;
+  choices?: Array<{
+    message?: {
+      content: string;
+    };
+    content?: string;
+    finish_reason?: string;
+  }>;
+  content?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
 
 // Initialize OpenAI client
 let openaiClient: OpenAI | null = null;
@@ -22,11 +39,10 @@ function getOpenAIClient(): OpenAI {
     openaiClient = new OpenAI({
       apiKey: config.openaiApiKey,
     });
-    logger.info('OpenAI client initialized');
+    logger.info("OpenAI client initialized");
   }
   return openaiClient;
 }
-
 
 async function makeOpenAIResponsesRequest(
   request: ChatCompletionRequest,
@@ -36,24 +52,26 @@ async function makeOpenAIResponsesRequest(
   const startTime = Date.now();
 
   try {
-    logger.debug('Making OpenAI responses API request', { model, userId });
+    logger.debug("Making OpenAI responses API request", { model, userId });
 
     const apiKey = config.openaiApiKey;
     if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
+      throw new Error("OpenAI API key not configured");
     }
 
     // Make direct HTTP request to v1/responses endpoint
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
         messages: request.messages,
-        ...(request.temperature !== undefined && { temperature: request.temperature }),
+        ...(request.temperature !== undefined && {
+          temperature: request.temperature,
+        }),
         ...(request.max_tokens && { max_tokens: request.max_tokens }),
         ...(request.top_p !== undefined && { top_p: request.top_p }),
         ...(request.stop && { stop: request.stop }),
@@ -65,42 +83,43 @@ async function makeOpenAIResponsesRequest(
       let errorMessage = `OpenAI API request failed: ${response.statusText}`;
       try {
         const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorJson.error || errorMessage;
+        errorMessage =
+          errorJson.error?.message || errorJson.error || errorMessage;
       } catch {
         errorMessage = errorText || errorMessage;
       }
       throw new Error(errorMessage);
     }
 
-    const responseData = await response.json();
+    const responseData = (await response.json()) as OpenAIResponsesResponse;
 
     const duration = Date.now() - startTime;
     const totalTokens = responseData.usage?.total_tokens || 0;
 
-    logLLMRequest(userId, model, 'openai', totalTokens, duration);
+    logLLMRequest(userId, model, "openai", totalTokens, duration);
 
     // Transform responses format to chat completions format
     // The responses endpoint returns a different structure, so we need to adapt it
     return {
       id: responseData.id || `resp-${Date.now()}`,
-      object: 'chat.completion',
+      object: "chat.completion",
       created: responseData.created || Math.floor(Date.now() / 1000),
       model: responseData.model || model,
       choices: responseData.choices?.map((choice: any, index: number) => ({
         index,
         message: {
-          role: 'assistant',
-          content: choice.message?.content || choice.content || '',
+          role: "assistant",
+          content: choice.message?.content || choice.content || "",
         },
-        finish_reason: choice.finish_reason || 'stop',
+        finish_reason: choice.finish_reason || "stop",
       })) || [
         {
           index: 0,
           message: {
-            role: 'assistant',
-            content: responseData.content || '',
+            role: "assistant",
+            content: responseData.content || "",
           },
-          finish_reason: 'stop',
+          finish_reason: "stop",
         },
       ],
       usage: responseData.usage || {
@@ -111,7 +130,7 @@ async function makeOpenAIResponsesRequest(
     } as ChatCompletionResponse;
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.error('OpenAI responses API request failed', {
+    logger.error("OpenAI responses API request failed", {
       error: error.message,
       model,
       userId,
@@ -119,8 +138,8 @@ async function makeOpenAIResponsesRequest(
     });
 
     throw new ProviderError(
-      error.message || 'OpenAI responses API request failed',
-      'openai',
+      error.message || "OpenAI responses API request failed",
+      "openai",
       {
         statusCode: error.status || error.statusCode || 500,
         code: error.code,
@@ -145,25 +164,39 @@ export async function makeOpenAIRequest(
   try {
     // Apply parameter constraints based on model configuration
     const constrainedRequest = applyParameterConstraints(request, model);
-    
+
     // Determine which endpoint to use
     const endpointType = getEndpointType(model);
 
-    if (endpointType === 'responses') {
-      return await makeOpenAIResponsesRequest(constrainedRequest, model, userId);
+    if (endpointType === "responses") {
+      return await makeOpenAIResponsesRequest(
+        constrainedRequest,
+        model,
+        userId
+      );
     }
 
     // Default to chat/completions endpoint
     const client = getOpenAIClient();
 
-    logger.debug('Making OpenAI API request', { model, userId, endpoint: 'chat/completions' });
+    logger.debug("Making OpenAI API request", {
+      model,
+      userId,
+      endpoint: "chat/completions",
+    });
 
     const response = await client.chat.completions.create({
       model,
       messages: constrainedRequest.messages,
-      ...(constrainedRequest.temperature !== undefined && { temperature: constrainedRequest.temperature }),
-      ...(constrainedRequest.max_tokens && { max_tokens: constrainedRequest.max_tokens }),
-      ...(constrainedRequest.top_p !== undefined && { top_p: constrainedRequest.top_p }),
+      ...(constrainedRequest.temperature !== undefined && {
+        temperature: constrainedRequest.temperature,
+      }),
+      ...(constrainedRequest.max_tokens && {
+        max_tokens: constrainedRequest.max_tokens,
+      }),
+      ...(constrainedRequest.top_p !== undefined && {
+        top_p: constrainedRequest.top_p,
+      }),
       ...(constrainedRequest.frequency_penalty !== undefined && {
         frequency_penalty: constrainedRequest.frequency_penalty,
       }),
@@ -177,13 +210,13 @@ export async function makeOpenAIRequest(
     const duration = Date.now() - startTime;
     const totalTokens = response.usage?.total_tokens || 0;
 
-    logLLMRequest(userId, model, 'openai', totalTokens, duration);
+    logLLMRequest(userId, model, "openai", totalTokens, duration);
 
     // OpenAI response is already in our standard format
     return response as ChatCompletionResponse;
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.error('OpenAI API request failed', {
+    logger.error("OpenAI API request failed", {
       error: error.message,
       model,
       userId,
@@ -191,8 +224,8 @@ export async function makeOpenAIRequest(
     });
 
     throw new ProviderError(
-      error.message || 'OpenAI API request failed',
-      'openai',
+      error.message || "OpenAI API request failed",
+      "openai",
       {
         statusCode: error.status,
         code: error.code,
@@ -217,33 +250,46 @@ export async function* makeOpenAIStreamRequest(
   try {
     // Apply parameter constraints based on model configuration
     const constrainedRequest = applyParameterConstraints(request, model);
-    
+
     // Determine which endpoint to use
     const endpointType = getEndpointType(model);
 
     // Note: Responses endpoint may not support streaming
     // For now, we'll attempt streaming on chat/completions only
-    if (endpointType === 'responses') {
-      logger.warn('Streaming not supported for responses endpoint, falling back to non-streaming', { model });
+    if (endpointType === "responses") {
+      logger.warn(
+        "Streaming not supported for responses endpoint, falling back to non-streaming",
+        { model }
+      );
       // For responses endpoint, we'd need to handle differently
       // For now, throw an error indicating streaming isn't supported
       throw new ProviderError(
-        'Streaming is not supported for models using the responses endpoint',
-        'openai',
+        "Streaming is not supported for models using the responses endpoint",
+        "openai",
         { statusCode: 400 }
       );
     }
 
     const client = getOpenAIClient();
 
-    logger.debug('Making OpenAI streaming API request', { model, userId, endpoint: 'chat/completions' });
+    logger.debug("Making OpenAI streaming API request", {
+      model,
+      userId,
+      endpoint: "chat/completions",
+    });
 
     const stream = await client.chat.completions.create({
       model,
       messages: constrainedRequest.messages,
-      ...(constrainedRequest.temperature !== undefined && { temperature: constrainedRequest.temperature }),
-      ...(constrainedRequest.max_tokens && { max_tokens: constrainedRequest.max_tokens }),
-      ...(constrainedRequest.top_p !== undefined && { top_p: constrainedRequest.top_p }),
+      ...(constrainedRequest.temperature !== undefined && {
+        temperature: constrainedRequest.temperature,
+      }),
+      ...(constrainedRequest.max_tokens && {
+        max_tokens: constrainedRequest.max_tokens,
+      }),
+      ...(constrainedRequest.top_p !== undefined && {
+        top_p: constrainedRequest.top_p,
+      }),
       ...(constrainedRequest.frequency_penalty !== undefined && {
         frequency_penalty: constrainedRequest.frequency_penalty,
       }),
@@ -266,10 +312,10 @@ export async function* makeOpenAIStreamRequest(
     }
 
     const duration = Date.now() - startTime;
-    logLLMRequest(userId, model, 'openai', totalTokens, duration);
+    logLLMRequest(userId, model, "openai", totalTokens, duration);
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.error('OpenAI streaming API request failed', {
+    logger.error("OpenAI streaming API request failed", {
       error: error.message,
       model,
       userId,
@@ -277,8 +323,8 @@ export async function* makeOpenAIStreamRequest(
     });
 
     throw new ProviderError(
-      error.message || 'OpenAI streaming API request failed',
-      'openai',
+      error.message || "OpenAI streaming API request failed",
+      "openai",
       {
         statusCode: error.status,
         code: error.code,
@@ -297,15 +343,15 @@ export async function verifyOpenAIConnection(): Promise<boolean> {
 
     // Make a simple request to verify the API key
     await client.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: 'Hi' }],
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: "Hi" }],
       max_tokens: 1,
     });
 
-    logger.info('OpenAI connection verified');
+    logger.info("OpenAI connection verified");
     return true;
   } catch (error: any) {
-    logger.error('OpenAI connection verification failed', {
+    logger.error("OpenAI connection verification failed", {
       error: error.message,
     });
     return false;
