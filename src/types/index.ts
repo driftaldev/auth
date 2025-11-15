@@ -362,26 +362,58 @@ export interface ModelInfo {
   provider: LLMProvider;
   maxTokens: number;
   supportsStreaming: boolean;
+  description: string;
 }
 
 export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
   // OpenAI models
-  "gpt-4-turbo": {
-    name: "gpt-4-turbo",
-    provider: "openai",
-    maxTokens: 4096,
-    supportsStreaming: true,
-  },
-  "gpt-4": {
-    name: "gpt-4",
+  "gpt-5.1": {
+    name: "GPT-5.1",
     provider: "openai",
     maxTokens: 8192,
     supportsStreaming: true,
+    description: "Latest GPT-5 model",
   },
-  "gpt-3.5-turbo": {
-    name: "gpt-3.5-turbo",
+  "gpt-5.1-codex": {
+    name: "GPT-5.1 Codex",
+    provider: "openai",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "GPT-5.1 optimized for code generation",
+  },
+  "gpt-5-codex": {
+    name: "GPT-5 Codex",
+    provider: "openai",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "GPT-5 optimized for code generation",
+  },
+  "o4-mini": {
+    name: "O4 Mini",
     provider: "openai",
     maxTokens: 4096,
     supportsStreaming: true,
+    description: "Smaller, faster O4 model",
+  },
+  "o3-mini": {
+    name: "O3 Mini",
+    provider: "openai",
+    maxTokens: 4096,
+    supportsStreaming: true,
+    description: "Smaller, faster O3 model",
+  },
+  "gpt-5.1-codex-mini": {
+    name: "GPT-5.1 Codex Mini",
+    provider: "openai",
+    maxTokens: 4096,
+    supportsStreaming: true,
+    description: "Compact GPT-5.1 Codex model",
+  },
+  o3: {
+    name: "O3",
+    provider: "openai",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "O3 reasoning model",
   },
 };

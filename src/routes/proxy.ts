@@ -314,7 +314,9 @@ router.get(
 
     const models = Object.entries(SUPPORTED_MODELS).map(([id, info]) => ({
       id,
+      name: info.name,
       provider: info.provider,
+      description: info.description,
       max_tokens: info.maxTokens,
       supports_streaming: info.supportsStreaming,
     }));
