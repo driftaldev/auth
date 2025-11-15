@@ -395,13 +395,6 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     supportsStreaming: true,
     description: "Smaller, faster O4 model",
   },
-  "o3-mini": {
-    name: "O3 Mini",
-    provider: "openai",
-    maxTokens: 4096,
-    supportsStreaming: true,
-    description: "Smaller, faster O3 model",
-  },
   "gpt-5.1-codex-mini": {
     name: "GPT-5.1 Codex Mini",
     provider: "openai",

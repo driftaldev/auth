@@ -24,7 +24,6 @@ function mapToActualModelName(modelId: string, provider: LLMProvider): string {
     "gpt-5.1-codex": "gpt-5-codex",
     "gpt-5-codex": "gpt-5-codex",
     "o4-mini": "o4-mini",
-    "o3-mini": "o3-mini",
     "gpt-5.1-codex-mini": "gpt-5-mini",
     o3: "o3",
   };
@@ -71,6 +70,8 @@ export async function routeLLMRequest(
 ): Promise<ChatCompletionResponse> {
   const startTime = Date.now();
 
+  console.log("Route LLM Request", request);
+
   try {
     // Determine which model to use
     let model: string;
@@ -106,6 +107,7 @@ export async function routeLLMRequest(
     if (provider === "anthropic") {
       response = await makeAnthropicRequest(request, actualModelName, userId);
     } else if (provider === "openai") {
+      console.log("Making OpenAI request", request);
       response = await makeOpenAIRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
@@ -213,12 +215,6 @@ export async function* routeLLMStreamRequest(
   }
 }
 
-/**
- * Log usage to database using Prisma
- * NOTE: Individual LLM request logging is currently disabled.
- * The usage_logs table was transformed to track complete reviews instead.
- * Individual request tracking may be re-enabled in the future if needed.
- */
 async function logUsage(
   userId: string,
   model: string,
