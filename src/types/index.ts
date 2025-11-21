@@ -449,25 +449,11 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     description: "O3 reasoning model",
   },
   // Google Gemini models
-  "gemini-2.0-flash-exp": {
-    name: "Gemini 2.0 Flash (Experimental)",
+  "gemini-3-pro-preview": {
+    name: "Gemini 3 Pro Preview",
     provider: "gemini",
     maxTokens: 8192,
     supportsStreaming: true,
-    description: "Fast and efficient Gemini 2.0 model",
-  },
-  "gemini-1.5-pro": {
-    name: "Gemini 1.5 Pro",
-    provider: "gemini",
-    maxTokens: 8192,
-    supportsStreaming: true,
-    description: "Most capable Gemini 1.5 model",
-  },
-  "gemini-1.5-flash": {
-    name: "Gemini 1.5 Flash",
-    provider: "gemini",
-    maxTokens: 8192,
-    supportsStreaming: true,
-    description: "Faster, optimized Gemini 1.5 model",
+    description: "Gemini 3 Pro preview model",
   },
 };

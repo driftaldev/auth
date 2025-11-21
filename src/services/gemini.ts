@@ -139,11 +139,11 @@ export async function makeGeminiRequest(
 
     logger.debug("Making Gemini API request", { model, userId });
 
-    // Get the model instance
-    const genModel = client.models.get(model);
-
     // Generate content
-    const response = await genModel.generateContent(geminiRequest);
+    const response = await client.models.generateContent({
+      model,
+      ...geminiRequest,
+    });
 
     const duration = Date.now() - startTime;
     const totalTokens = response.usageMetadata?.totalTokenCount || 0;
@@ -193,11 +193,11 @@ export async function* makeGeminiStreamRequest(
 
     logger.debug("Making Gemini streaming API request", { model, userId });
 
-    // Get the model instance
-    const genModel = client.models.get(model);
-
     // Generate content stream
-    const stream = await genModel.generateContentStream(geminiRequest);
+    const stream = await client.models.generateContentStream({
+      model,
+      ...geminiRequest,
+    });
 
     const messageId = `chatcmpl-${Date.now()}`;
     const created = Math.floor(Date.now() / 1000);
@@ -279,9 +279,9 @@ export async function verifyGeminiConnection(): Promise<boolean> {
   try {
     const client = getGeminiClient();
 
-    // Get a model and make a simple request to verify the API key
-    const model = client.models.get("gemini-1.5-flash");
-    await model.generateContent({
+    // Make a simple request to verify the API key
+    await client.models.generateContent({
+      model: "gemini-3-pro-preview",
       contents: [
         {
           role: "user",
