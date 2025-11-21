@@ -11,6 +11,10 @@ import {
   makeGeminiRequest,
   makeGeminiStreamRequest,
 } from "./gemini.js";
+import {
+  makeOpenRouterRequest,
+  makeOpenRouterStreamRequest,
+} from "./openrouter.js";
 import { logger } from "../config/logger.js";
 import {
   ChatCompletionRequest,
@@ -115,6 +119,8 @@ export async function routeLLMRequest(
       response = await makeOpenAIRequest(request, actualModelName, userId);
     } else if (provider === "gemini") {
       response = await makeGeminiRequest(request, actualModelName, userId);
+    } else if (provider === "openrouter") {
+      response = await makeOpenRouterRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -196,6 +202,8 @@ export async function* routeLLMStreamRequest(
       yield* makeOpenAIStreamRequest(request, actualModelName, userId);
     } else if (provider === "gemini") {
       yield* makeGeminiStreamRequest(request, actualModelName, userId);
+    } else if (provider === "openrouter") {
+      yield* makeOpenRouterStreamRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }

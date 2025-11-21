@@ -282,6 +282,7 @@ export interface Config {
   openaiApiKey: string;
   anthropicApiKey: string;
   geminiApiKey: string;
+  openrouterApiKey: string;
 
   // Moss (Semantic Code Search)
   mossProjectId: string;
@@ -394,7 +395,7 @@ export interface HealthCheckResponse {
 // Model Mapping Types
 // ============================================================================
 
-export type LLMProvider = "openai" | "anthropic" | "gemini";
+export type LLMProvider = "openai" | "anthropic" | "gemini" | "openrouter";
 
 export interface ModelInfo {
   name: string;
@@ -455,5 +456,13 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Gemini 3 Pro preview model",
+  },
+  // OpenRouter models
+  "anthropic/claude-sonnet-4.5": {
+    name: "Claude Sonnet 4.5",
+    provider: "openrouter",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "Claude Sonnet 4.5 via OpenRouter",
   },
 };

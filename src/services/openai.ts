@@ -10,7 +10,7 @@ import {
   ProviderError,
 } from "../types/index.js";
 import { getEndpointType, applyParameterConstraints } from "./model-config.js";
-import { createRecordedOpenAI } from "ai-session-replay-sdk";
+import { OpenAI } from "openai";
 
 // Type for OpenAI /v1/responses endpoint response
 interface OpenAIResponsesResponse {
@@ -33,19 +33,11 @@ interface OpenAIResponsesResponse {
 }
 
 // Initialize OpenAI client
-let openaiClient: any = null;
+let openaiClient: OpenAI | null = null;
 
-function getOpenAIClient() {
+function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
-    openaiClient = createRecordedOpenAI({
-      apiKey: config.openaiApiKey,
-      replayEndpoint: process.env.REPLAY_API_URL || "http://localhost:3005",
-      debug: true,
-      sessionOptions: {
-        autoStart: true,
-      },
-    });
-    console.log("OpenAI client initialized", openaiClient);
+    openaiClient = new OpenAI({ apiKey: config.openaiApiKey });
     logger.info("OpenAI client initialized");
   }
   return openaiClient;
