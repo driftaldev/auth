@@ -1,8 +1,8 @@
 // Anthropic API service with request/response transformation
 
-import Anthropic from '@anthropic-ai/sdk';
-import { config } from '../config/index.js';
-import { logger, logLLMRequest } from '../config/logger.js';
+import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../config/index.js";
+import { logger, logLLMRequest } from "../config/logger.js";
 import {
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -11,7 +11,7 @@ import {
   AnthropicResponse,
   ProviderError,
   Message,
-} from '../types/index.js';
+} from "../types/index.js";
 
 // Initialize Anthropic client
 let anthropicClient: Anthropic | null = null;
@@ -21,7 +21,7 @@ function getAnthropicClient(): Anthropic {
     anthropicClient = new Anthropic({
       apiKey: config.anthropicApiKey,
     });
-    logger.info('Anthropic client initialized');
+    logger.info("Anthropic client initialized");
   }
   return anthropicClient;
 }
@@ -34,14 +34,14 @@ function transformToAnthropicFormat(
   model: string
 ): AnthropicRequest {
   // Extract system message (Anthropic uses separate system parameter)
-  const systemMessages = request.messages.filter((m) => m.role === 'system');
-  const systemContent = systemMessages.map((m) => m.content).join('\n');
+  const systemMessages = request.messages.filter((m) => m.role === "system");
+  const systemContent = systemMessages.map((m) => m.content).join("\n");
 
   // Filter out system messages from regular messages
   const messages = request.messages
-    .filter((m) => m.role !== 'system')
+    .filter((m) => m.role !== "system")
     .map((m) => ({
-      role: m.role as 'user' | 'assistant',
+      role: m.role as "user" | "assistant",
       content: m.content,
     }));
 
@@ -50,10 +50,14 @@ function transformToAnthropicFormat(
     max_tokens: request.max_tokens || 4096,
     messages,
     ...(systemContent && { system: systemContent }),
-    ...(request.temperature !== undefined && { temperature: request.temperature }),
+    ...(request.temperature !== undefined && {
+      temperature: request.temperature,
+    }),
     ...(request.top_p !== undefined && { top_p: request.top_p }),
     ...(request.stop && {
-      stop_sequences: Array.isArray(request.stop) ? request.stop : [request.stop],
+      stop_sequences: Array.isArray(request.stop)
+        ? request.stop
+        : [request.stop],
     }),
     ...(request.stream !== undefined && { stream: request.stream }),
   };
@@ -69,20 +73,20 @@ function transformFromAnthropicFormat(
   model: string
 ): ChatCompletionResponse {
   const content = response.content
-    .filter((c) => c.type === 'text')
+    .filter((c) => c.type === "text")
     .map((c) => c.text)
-    .join('');
+    .join("");
 
   return {
     id: response.id,
-    object: 'chat.completion',
+    object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
     model,
     choices: [
       {
         index: 0,
         message: {
-          role: 'assistant',
+          role: "assistant",
           content,
         },
         finish_reason: mapAnthropicStopReason(response.stop_reason),
@@ -101,14 +105,14 @@ function transformFromAnthropicFormat(
  */
 function mapAnthropicStopReason(
   stopReason: string | null
-): 'stop' | 'length' | 'content_filter' | null {
+): "stop" | "length" | "content_filter" | null {
   switch (stopReason) {
-    case 'end_turn':
-      return 'stop';
-    case 'max_tokens':
-      return 'length';
-    case 'stop_sequence':
-      return 'stop';
+    case "end_turn":
+      return "stop";
+    case "max_tokens":
+      return "length";
+    case "stop_sequence":
+      return "stop";
     default:
       return null;
   }
@@ -128,15 +132,17 @@ export async function makeAnthropicRequest(
     const client = getAnthropicClient();
     const anthropicRequest = transformToAnthropicFormat(request, model);
 
-    logger.debug('Making Anthropic API request', { model, userId });
+    logger.debug("Making Anthropic API request", { model, userId });
 
-    const response = await client.messages.create(anthropicRequest) as Anthropic.Message;
+    const response = (await client.messages.create(
+      anthropicRequest
+    )) as Anthropic.Message;
 
     const duration = Date.now() - startTime;
     const totalTokens =
       response.usage.input_tokens + response.usage.output_tokens;
 
-    logLLMRequest(userId, model, 'anthropic', totalTokens, duration);
+    logLLMRequest(userId, model, "anthropic", totalTokens, duration);
 
     const standardResponse = transformFromAnthropicFormat(
       response as unknown as AnthropicResponse,
@@ -146,7 +152,7 @@ export async function makeAnthropicRequest(
     return standardResponse;
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.error('Anthropic API request failed', {
+    logger.error("Anthropic API request failed", {
       error: error.message,
       model,
       userId,
@@ -154,8 +160,8 @@ export async function makeAnthropicRequest(
     });
 
     throw new ProviderError(
-      error.message || 'Anthropic API request failed',
-      'anthropic',
+      error.message || "Anthropic API request failed",
+      "anthropic",
       {
         statusCode: error.status,
         type: error.type,
@@ -180,7 +186,7 @@ export async function* makeAnthropicStreamRequest(
     const anthropicRequest = transformToAnthropicFormat(request, model);
     anthropicRequest.stream = true;
 
-    logger.debug('Making Anthropic streaming API request', { model, userId });
+    logger.debug("Making Anthropic streaming API request", { model, userId });
 
     const stream = await client.messages.stream(anthropicRequest);
 
@@ -189,12 +195,12 @@ export async function* makeAnthropicStreamRequest(
 
     // Yield chunks as they arrive
     for await (const event of stream) {
-      if (event.type === 'content_block_delta') {
+      if (event.type === "content_block_delta") {
         const delta = event.delta;
-        if (delta.type === 'text_delta') {
+        if (delta.type === "text_delta") {
           yield {
             id: messageId,
-            object: 'chat.completion.chunk',
+            object: "chat.completion.chunk",
             created,
             model,
             choices: [
@@ -208,18 +214,18 @@ export async function* makeAnthropicStreamRequest(
             ],
           };
         }
-      } else if (event.type === 'message_stop') {
+      } else if (event.type === "message_stop") {
         // Final chunk with finish reason
         yield {
           id: messageId,
-          object: 'chat.completion.chunk',
+          object: "chat.completion.chunk",
           created,
           model,
           choices: [
             {
               index: 0,
               delta: {},
-              finish_reason: 'stop',
+              finish_reason: "stop",
             },
           ],
         };
@@ -231,10 +237,10 @@ export async function* makeAnthropicStreamRequest(
       finalMessage.usage.input_tokens + finalMessage.usage.output_tokens;
 
     const duration = Date.now() - startTime;
-    logLLMRequest(userId, model, 'anthropic', totalTokens, duration);
+    logLLMRequest(userId, model, "anthropic", totalTokens, duration);
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.error('Anthropic streaming API request failed', {
+    logger.error("Anthropic streaming API request failed", {
       error: error.message,
       model,
       userId,
@@ -242,8 +248,8 @@ export async function* makeAnthropicStreamRequest(
     });
 
     throw new ProviderError(
-      error.message || 'Anthropic streaming API request failed',
-      'anthropic',
+      error.message || "Anthropic streaming API request failed",
+      "anthropic",
       {
         statusCode: error.status,
         type: error.type,
@@ -261,15 +267,15 @@ export async function verifyAnthropicConnection(): Promise<boolean> {
 
     // Make a simple request to verify the API key
     await client.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: "claude-3-5-haiku-20241022",
       max_tokens: 1,
-      messages: [{ role: 'user', content: 'Hi' }],
+      messages: [{ role: "user", content: "Hi" }],
     });
 
-    logger.info('Anthropic connection verified');
+    logger.info("Anthropic connection verified");
     return true;
   } catch (error: any) {
-    logger.error('Anthropic connection verification failed', {
+    logger.error("Anthropic connection verification failed", {
       error: error.message,
     });
     return false;

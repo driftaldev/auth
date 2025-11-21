@@ -212,6 +212,44 @@ export interface AnthropicResponse {
   };
 }
 
+// Gemini
+export interface GeminiRequest {
+  contents: Array<{
+    role: "user" | "model";
+    parts: Array<{
+      text: string;
+    }>;
+  }>;
+  generationConfig?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+    topP?: number;
+    stopSequences?: string[];
+  };
+  systemInstruction?: {
+    parts: Array<{
+      text: string;
+    }>;
+  };
+}
+
+export interface GeminiResponse {
+  candidates: Array<{
+    content: {
+      parts: Array<{
+        text: string;
+      }>;
+      role: string;
+    };
+    finishReason: string;
+  }>;
+  usageMetadata: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+    totalTokenCount: number;
+  };
+}
+
 // ============================================================================
 // Express Types
 // ============================================================================
@@ -243,6 +281,7 @@ export interface Config {
   // LLM Providers
   openaiApiKey: string;
   anthropicApiKey: string;
+  geminiApiKey: string;
 
   // Moss (Semantic Code Search)
   mossProjectId: string;
@@ -355,7 +394,7 @@ export interface HealthCheckResponse {
 // Model Mapping Types
 // ============================================================================
 
-export type LLMProvider = "openai" | "anthropic";
+export type LLMProvider = "openai" | "anthropic" | "gemini";
 
 export interface ModelInfo {
   name: string;
@@ -408,5 +447,27 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 8192,
     supportsStreaming: true,
     description: "O3 reasoning model",
+  },
+  // Google Gemini models
+  "gemini-2.0-flash-exp": {
+    name: "Gemini 2.0 Flash (Experimental)",
+    provider: "gemini",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "Fast and efficient Gemini 2.0 model",
+  },
+  "gemini-1.5-pro": {
+    name: "Gemini 1.5 Pro",
+    provider: "gemini",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "Most capable Gemini 1.5 model",
+  },
+  "gemini-1.5-flash": {
+    name: "Gemini 1.5 Flash",
+    provider: "gemini",
+    maxTokens: 8192,
+    supportsStreaming: true,
+    description: "Faster, optimized Gemini 1.5 model",
   },
 };

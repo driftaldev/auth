@@ -10,6 +10,7 @@ import {
   ProviderError,
 } from "../types/index.js";
 import { getEndpointType, applyParameterConstraints } from "./model-config.js";
+import { createRecordedOpenAI } from "ai-session-replay-sdk";
 
 // Type for OpenAI /v1/responses endpoint response
 interface OpenAIResponsesResponse {
@@ -32,13 +33,19 @@ interface OpenAIResponsesResponse {
 }
 
 // Initialize OpenAI client
-let openaiClient: OpenAI | null = null;
+let openaiClient: any = null;
 
-function getOpenAIClient(): OpenAI {
+function getOpenAIClient() {
   if (!openaiClient) {
-    openaiClient = new OpenAI({
+    openaiClient = createRecordedOpenAI({
       apiKey: config.openaiApiKey,
+      replayEndpoint: process.env.REPLAY_API_URL || "http://localhost:3005",
+      debug: true,
+      sessionOptions: {
+        autoStart: true,
+      },
     });
+    console.log("OpenAI client initialized", openaiClient);
     logger.info("OpenAI client initialized");
   }
   return openaiClient;
@@ -52,6 +59,11 @@ async function makeOpenAIResponsesRequest(
   const startTime = Date.now();
 
   try {
+    console.log("Making OpenAI responses API request", {
+      request,
+      model,
+      userId,
+    });
     logger.debug("Making OpenAI responses API request", { model, userId });
 
     const apiKey = config.openaiApiKey;
@@ -91,7 +103,44 @@ async function makeOpenAIResponsesRequest(
       throw new Error(errorMessage);
     }
 
-    const responseData = (await response.json()) as OpenAIResponsesResponse;
+    const responseText = await response.text();
+    let responseData: OpenAIResponsesResponse;
+
+    try {
+      responseData = JSON.parse(responseText) as OpenAIResponsesResponse;
+    } catch (parseError) {
+      logger.error("Failed to parse OpenAI responses API response", {
+        responseText,
+        model,
+        userId,
+      });
+      throw new Error(
+        `Invalid JSON response from OpenAI: ${responseText.substring(0, 200)}`
+      );
+    }
+
+    // Check if response contains an error (even if HTTP status is 200)
+    if ((responseData as any).error) {
+      const errorMsg =
+        (responseData as any).error?.message ||
+        (responseData as any).error ||
+        "Unknown error";
+      logger.error("OpenAI responses API returned error in response body", {
+        error: errorMsg,
+        model,
+        userId,
+        responseData,
+      });
+      throw new Error(`OpenAI API error: ${errorMsg}`);
+    }
+
+    logger.debug("OpenAI responses API response", {
+      model,
+      userId,
+      hasChoices: !!responseData.choices,
+      choicesLength: responseData.choices?.length,
+      hasContent: !!responseData.content,
+    });
 
     const duration = Date.now() - startTime;
     const totalTokens = responseData.usage?.total_tokens || 0;
@@ -100,28 +149,46 @@ async function makeOpenAIResponsesRequest(
 
     // Transform responses format to chat completions format
     // The responses endpoint returns a different structure, so we need to adapt it
+    const choices =
+      responseData.choices &&
+      Array.isArray(responseData.choices) &&
+      responseData.choices.length > 0
+        ? responseData.choices.map((choice: any, index: number) => ({
+            index,
+            message: {
+              role: "assistant",
+              content: choice.message?.content || choice.content || "",
+            },
+            finish_reason: choice.finish_reason || "stop",
+          }))
+        : responseData.content
+        ? [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: responseData.content,
+              },
+              finish_reason: "stop",
+            },
+          ]
+        : [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: "",
+              },
+              finish_reason: "stop",
+            },
+          ];
+
     return {
       id: responseData.id || `resp-${Date.now()}`,
       object: "chat.completion",
       created: responseData.created || Math.floor(Date.now() / 1000),
       model: responseData.model || model,
-      choices: responseData.choices?.map((choice: any, index: number) => ({
-        index,
-        message: {
-          role: "assistant",
-          content: choice.message?.content || choice.content || "",
-        },
-        finish_reason: choice.finish_reason || "stop",
-      })) || [
-        {
-          index: 0,
-          message: {
-            role: "assistant",
-            content: responseData.content || "",
-          },
-          finish_reason: "stop",
-        },
-      ],
+      choices,
       usage: responseData.usage || {
         prompt_tokens: 0,
         completion_tokens: 0,
@@ -162,13 +229,17 @@ export async function makeOpenAIRequest(
   const startTime = Date.now();
 
   try {
+    logger.debug("makeOpenAIRequest called", { model, userId });
+
     // Apply parameter constraints based on model configuration
     const constrainedRequest = applyParameterConstraints(request, model);
 
     // Determine which endpoint to use
     const endpointType = getEndpointType(model);
+    logger.debug("Endpoint type determined", { model, endpointType });
 
     if (endpointType === "responses") {
+      logger.debug("Using responses endpoint", { model });
       return await makeOpenAIResponsesRequest(
         constrainedRequest,
         model,
@@ -177,6 +248,9 @@ export async function makeOpenAIRequest(
     }
 
     // Default to chat/completions endpoint
+    logger.debug("Using chat/completions endpoint, initializing client", {
+      model,
+    });
     const client = getOpenAIClient();
 
     logger.debug("Making OpenAI API request", {

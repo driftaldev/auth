@@ -27,55 +27,57 @@ router.use(verifyToken);
 /**
  * Chat completions handler (shared for both /v1/chat/completions and /chat/completions)
  */
-const chatCompletionsHandler = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.userId!;
+const chatCompletionsHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.userId!;
 
-  // Validate request body
-  validateChatCompletionRequest(req.body);
+    // Validate request body
+    validateChatCompletionRequest(req.body);
 
-  const chatRequest = req.body;
-  const isStreaming = chatRequest.stream === true;
+    const chatRequest = req.body;
+    const isStreaming = chatRequest.stream === true;
 
-  logger.info("Chat completion request", {
-    userId,
-    model: chatRequest.model || "default",
-    streaming: isStreaming,
-    messageCount: chatRequest.messages.length,
-  });
+    logger.info("Chat completion request", {
+      userId,
+      model: chatRequest.model || "default",
+      streaming: isStreaming,
+      messageCount: chatRequest.messages.length,
+    });
 
-  if (isStreaming) {
-    // Handle streaming response with Server-Sent Events
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
+    if (isStreaming) {
+      // Handle streaming response with Server-Sent Events
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
 
-    try {
-      const stream = routeLLMStreamRequest(chatRequest, userId);
+      try {
+        const stream = routeLLMStreamRequest(chatRequest, userId);
 
-      for await (const chunk of stream) {
-        // Send chunk as SSE data
-        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        for await (const chunk of stream) {
+          // Send chunk as SSE data
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        }
+
+        // Send done signal
+        res.write("data: [DONE]\n\n");
+        res.end();
+      } catch (error) {
+        // Send error as SSE
+        res.write(
+          `data: ${JSON.stringify({
+            error: error instanceof Error ? error.message : "Unknown error",
+          })}\n\n`
+        );
+        res.end();
       }
-
-      // Send done signal
-      res.write("data: [DONE]\n\n");
-      res.end();
-    } catch (error) {
-      // Send error as SSE
-      res.write(
-        `data: ${JSON.stringify({
-          error: error instanceof Error ? error.message : "Unknown error",
-        })}\n\n`
-      );
-      res.end();
+    } else {
+      // Handle non-streaming response
+      const response = await routeLLMRequest(chatRequest, userId);
+      res.json(response);
     }
-  } else {
-    // Handle non-streaming response
-    const response = await routeLLMRequest(chatRequest, userId);
-    res.json(response);
   }
-});
+);
 
 /**
  * POST /v1/chat/completions
@@ -216,10 +218,16 @@ router.post(
     } = req.body;
 
     // Validate required fields
-    if (!email || !model || total_tokens === undefined ||
-        lines_of_code_reviewed === undefined || review_duration_ms === undefined) {
+    if (
+      !email ||
+      !model ||
+      total_tokens === undefined ||
+      lines_of_code_reviewed === undefined ||
+      review_duration_ms === undefined
+    ) {
       res.status(400).json({
-        error: "Missing required fields: email, model, total_tokens, lines_of_code_reviewed, review_duration_ms",
+        error:
+          "Missing required fields: email, model, total_tokens, lines_of_code_reviewed, review_duration_ms",
       });
       return;
     }
@@ -239,7 +247,7 @@ router.post(
         });
         return;
       }
-      if (!['critical', 'high', 'medium', 'low'].includes(issue.severity)) {
+      if (!["critical", "high", "medium", "low"].includes(issue.severity)) {
         res.status(400).json({
           error: "Issue severity must be critical, high, medium, or low",
         });

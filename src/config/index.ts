@@ -30,6 +30,7 @@ const configSchema = z.object({
   // LLM Providers
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
+  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
 
   // Moss (Semantic Code Search)
   MOSS_PROJECT_ID: z.string().min(1, "MOSS_PROJECT_ID is required"),
@@ -90,6 +91,7 @@ function loadConfig(): Config {
       redisToken: parsed.REDIS_TOKEN,
       openaiApiKey: parsed.OPENAI_API_KEY,
       anthropicApiKey: parsed.ANTHROPIC_API_KEY,
+      geminiApiKey: parsed.GEMINI_API_KEY,
       mossProjectId: parsed.MOSS_PROJECT_ID,
       mossProjectKey: parsed.MOSS_PROJECT_KEY,
       morphApiKey: parsed.MORPH_API_KEY,

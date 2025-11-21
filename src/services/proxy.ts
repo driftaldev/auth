@@ -7,6 +7,10 @@ import {
   makeAnthropicStreamRequest,
 } from "./anthropic.js";
 import { makeOpenAIRequest, makeOpenAIStreamRequest } from "./openai.js";
+import {
+  makeGeminiRequest,
+  makeGeminiStreamRequest,
+} from "./gemini.js";
 import { logger } from "../config/logger.js";
 import {
   ChatCompletionRequest,
@@ -58,7 +62,7 @@ export async function getUserModel(userId: string): Promise<string> {
   );
   // Default to Claude 3.5 Sonnet
   // The CLI should always provide the model explicitly in requests
-  return "claude-3-5-sonnet-20241022";
+  return "gpt-5.1";
 }
 
 /**
@@ -109,6 +113,8 @@ export async function routeLLMRequest(
     } else if (provider === "openai") {
       console.log("Making OpenAI request", request);
       response = await makeOpenAIRequest(request, actualModelName, userId);
+    } else if (provider === "gemini") {
+      response = await makeGeminiRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -188,6 +194,8 @@ export async function* routeLLMStreamRequest(
       yield* makeAnthropicStreamRequest(request, actualModelName, userId);
     } else if (provider === "openai") {
       yield* makeOpenAIStreamRequest(request, actualModelName, userId);
+    } else if (provider === "gemini") {
+      yield* makeGeminiStreamRequest(request, actualModelName, userId);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }
