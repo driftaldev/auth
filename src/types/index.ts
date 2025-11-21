@@ -463,6 +463,6 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     provider: "openrouter",
     maxTokens: 8192,
     supportsStreaming: true,
-    description: "Claude Sonnet 4.5 via OpenRouter",
+    description: "Claude Sonnet 4.5",
   },
 };

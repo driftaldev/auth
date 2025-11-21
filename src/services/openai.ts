@@ -10,8 +10,6 @@ import {
   ProviderError,
 } from "../types/index.js";
 import { getEndpointType, applyParameterConstraints } from "./model-config.js";
-import { OpenAI } from "openai";
-
 // Type for OpenAI /v1/responses endpoint response
 interface OpenAIResponsesResponse {
   id?: string;

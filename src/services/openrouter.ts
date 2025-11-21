@@ -11,6 +11,26 @@ import {
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
+// Type for OpenRouter API response
+interface OpenRouterResponse {
+  id?: string;
+  created?: number;
+  model?: string;
+  choices?: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason?: string;
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
 /**
  * Make a non-streaming request to OpenRouter
  */
@@ -68,10 +88,12 @@ export async function makeOpenRouterRequest(
         error: errorMessage,
       });
 
-      throw new ProviderError(errorMessage, "openrouter", response.status);
+      throw new ProviderError(errorMessage, "openrouter", {
+        status: response.status,
+      });
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as OpenRouterResponse;
 
     // Transform OpenRouter response to our standard format
     const chatResponse: ChatCompletionResponse = {
@@ -79,13 +101,17 @@ export async function makeOpenRouterRequest(
       object: "chat.completion",
       created: data.created || Math.floor(Date.now() / 1000),
       model: data.model || model,
-      choices: data.choices.map((choice: any) => ({
+      choices: (data.choices || []).map((choice) => ({
         index: choice.index,
         message: {
-          role: choice.message.role,
+          role: choice.message.role as "assistant",
           content: choice.message.content,
         },
-        finish_reason: choice.finish_reason,
+        finish_reason: choice.finish_reason as
+          | "stop"
+          | "length"
+          | "content_filter"
+          | null,
       })),
       usage: data.usage
         ? {
@@ -99,19 +125,13 @@ export async function makeOpenRouterRequest(
     const duration = Date.now() - startTime;
 
     // Log the request
-    await logLLMRequest({
+    await logLLMRequest(
       userId,
-      provider: "openrouter",
       model,
-      promptTokens: chatResponse.usage?.prompt_tokens || 0,
-      completionTokens: chatResponse.usage?.completion_tokens || 0,
-      totalTokens: chatResponse.usage?.total_tokens || 0,
-      requestBody: request,
-      responseBody: chatResponse,
-      statusCode: 200,
-      duration,
-      error: null,
-    });
+      "openrouter",
+      chatResponse.usage?.total_tokens || 0,
+      duration
+    );
 
     logger.info("OpenRouter request completed", {
       userId,
@@ -125,19 +145,7 @@ export async function makeOpenRouterRequest(
     const duration = Date.now() - startTime;
 
     // Log the failed request
-    await logLLMRequest({
-      userId,
-      provider: "openrouter",
-      model,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      requestBody: request,
-      responseBody: null,
-      statusCode: error.statusCode || 500,
-      duration,
-      error: error.message,
-    });
+    await logLLMRequest(userId, model, "openrouter", 0, duration);
 
     logger.error("OpenRouter request failed", {
       userId,
@@ -153,7 +161,7 @@ export async function makeOpenRouterRequest(
     throw new ProviderError(
       error.message || "OpenRouter request failed",
       "openrouter",
-      500
+      { status: 500 }
     );
   }
 }
@@ -217,14 +225,16 @@ export async function* makeOpenRouterStreamRequest(
         error: errorMessage,
       });
 
-      throw new ProviderError(errorMessage, "openrouter", response.status);
+      throw new ProviderError(errorMessage, "openrouter", {
+        status: response.status,
+      });
     }
 
     if (!response.body) {
       throw new ProviderError(
         "No response body received from OpenRouter",
         "openrouter",
-        500
+        { status: 500 }
       );
     }
 
@@ -298,19 +308,7 @@ export async function* makeOpenRouterStreamRequest(
     const duration = Date.now() - startTime;
 
     // Log the streaming request
-    await logLLMRequest({
-      userId,
-      provider: "openrouter",
-      model,
-      promptTokens: totalPromptTokens,
-      completionTokens: totalCompletionTokens,
-      totalTokens: totalTokens,
-      requestBody: request,
-      responseBody: null,
-      statusCode: 200,
-      duration,
-      error: null,
-    });
+    await logLLMRequest(userId, model, "openrouter", totalTokens, duration);
 
     logger.info("OpenRouter stream completed", {
       userId,
@@ -322,19 +320,7 @@ export async function* makeOpenRouterStreamRequest(
     const duration = Date.now() - startTime;
 
     // Log the failed request
-    await logLLMRequest({
-      userId,
-      provider: "openrouter",
-      model,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      requestBody: request,
-      responseBody: null,
-      statusCode: error.statusCode || 500,
-      duration,
-      error: error.message,
-    });
+    await logLLMRequest(userId, model, "openrouter", 0, duration);
 
     logger.error("OpenRouter streaming request failed", {
       userId,
@@ -350,7 +336,7 @@ export async function* makeOpenRouterStreamRequest(
     throw new ProviderError(
       error.message || "OpenRouter streaming request failed",
       "openrouter",
-      500
+      { status: 500 }
     );
   }
 }
