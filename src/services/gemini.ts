@@ -78,9 +78,7 @@ function transformFromGeminiFormat(
   model: string
 ): ChatCompletionResponse {
   const candidate = response.candidates[0];
-  const content = candidate.content.parts
-    .map((part) => part.text)
-    .join("");
+  const content = candidate.content.parts.map((part) => part.text).join("");
 
   return {
     id: `chatcmpl-${Date.now()}`,
@@ -142,7 +140,17 @@ export async function makeGeminiRequest(
     // Generate content
     const response = await client.models.generateContent({
       model,
-      ...geminiRequest,
+      contents: geminiRequest.contents,
+      ...(geminiRequest.systemInstruction && {
+        config: {
+          systemInstruction: geminiRequest.systemInstruction,
+          ...geminiRequest.generationConfig,
+        },
+      }),
+      ...(!geminiRequest.systemInstruction &&
+        geminiRequest.generationConfig && {
+          config: geminiRequest.generationConfig,
+        }),
     });
 
     const duration = Date.now() - startTime;
@@ -196,7 +204,17 @@ export async function* makeGeminiStreamRequest(
     // Generate content stream
     const stream = await client.models.generateContentStream({
       model,
-      ...geminiRequest,
+      contents: geminiRequest.contents,
+      ...(geminiRequest.systemInstruction && {
+        config: {
+          systemInstruction: geminiRequest.systemInstruction,
+          ...geminiRequest.generationConfig,
+        },
+      }),
+      ...(!geminiRequest.systemInstruction &&
+        geminiRequest.generationConfig && {
+          config: geminiRequest.generationConfig,
+        }),
     });
 
     const messageId = `chatcmpl-${Date.now()}`;
@@ -227,7 +245,10 @@ export async function* makeGeminiStreamRequest(
         }
 
         // Check if this is the final chunk
-        if (candidate.finishReason && candidate.finishReason !== "UNSPECIFIED") {
+        if (
+          candidate.finishReason &&
+          candidate.finishReason !== "FINISH_REASON_UNSPECIFIED"
+        ) {
           yield {
             id: messageId,
             object: "chat.completion.chunk",
@@ -288,7 +309,7 @@ export async function verifyGeminiConnection(): Promise<boolean> {
           parts: [{ text: "Hi" }],
         },
       ],
-      generationConfig: {
+      config: {
         maxOutputTokens: 1,
       },
     });
