@@ -79,7 +79,6 @@ export async function routeLLMRequest(
       userId,
     });
 
-    // Use unified LLM service (handles all providers via OpenAI SDK)
     const response = await makeLLMRequest(request, model, userId);
 
     const duration = Date.now() - startTime;

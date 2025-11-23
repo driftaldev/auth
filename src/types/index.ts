@@ -391,8 +391,9 @@ export interface HealthCheckResponse {
   version?: string;
 }
 
-
 export type LLMProvider = "openai" | "openrouter" | "anthropic" | "gemini";
+
+export type LLMApiType = "chat_completions" | "responses";
 
 export interface ModelInfo {
   name: string;
@@ -400,16 +401,17 @@ export interface ModelInfo {
   maxTokens: number;
   supportsStreaming: boolean;
   description: string;
+  apiType: LLMApiType;
 }
 
 export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
-  // OpenAI models
   "gpt-5.1": {
     name: "GPT-5.1",
     provider: "openai",
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Latest GPT-5 model",
+    apiType: "chat_completions",
   },
   "gpt-5.1-codex": {
     name: "GPT-5.1 Codex",
@@ -417,6 +419,7 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 8192,
     supportsStreaming: true,
     description: "GPT-5.1 optimized for code generation",
+    apiType: "responses",
   },
   "gpt-5-codex": {
     name: "GPT-5 Codex",
@@ -424,6 +427,7 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 8192,
     supportsStreaming: true,
     description: "GPT-5 optimized for code generation",
+    apiType: "responses",
   },
   "o4-mini": {
     name: "O4 Mini",
@@ -431,6 +435,7 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 4096,
     supportsStreaming: true,
     description: "Smaller, faster O4 model",
+    apiType: "responses",
   },
   "gpt-5.1-codex-mini": {
     name: "GPT-5.1 Codex Mini",
@@ -438,6 +443,7 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 4096,
     supportsStreaming: true,
     description: "Compact GPT-5.1 Codex model",
+    apiType: "responses",
   },
   o3: {
     name: "O3",
@@ -445,14 +451,15 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 8192,
     supportsStreaming: true,
     description: "O3 reasoning model",
+    apiType: "responses",
   },
-  // Models via OpenRouter (Gemini, Anthropic, etc.)
   "google/gemini-3-pro-preview": {
     name: "Gemini 3 Pro Preview",
     provider: "openrouter",
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Gemini 3 Pro preview model",
+    apiType: "chat_completions",
   },
   "anthropic/claude-sonnet-4.5": {
     name: "Claude Sonnet 4.5",
@@ -460,5 +467,6 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Claude Sonnet 4.5 via OpenRouter",
+    apiType: "chat_completions",
   },
 };

@@ -25,7 +25,7 @@ router.use(verifyToken);
 // ============================================================================
 
 /**
- * Chat completions handler (shared for both /v1/chat/completions and /chat/completions)
+ * Chat completions handler for /v1/chat/completions
  */
 const chatCompletionsHandler = asyncHandler(
   async (req: Request, res: Response) => {
@@ -81,7 +81,6 @@ const chatCompletionsHandler = asyncHandler(
 
 /**
  * POST /v1/chat/completions
- * POST /chat/completions (alias for compatibility with Mastra/Vercel AI SDK)
  * Proxy LLM requests to any supported provider via unified OpenAI SDK interface
  *
  * Headers:
@@ -119,7 +118,6 @@ const chatCompletionsHandler = asyncHandler(
  *   Server-Sent Events (SSE) stream with data chunks
  */
 router.post("/v1/chat/completions", llmRateLimiter, chatCompletionsHandler);
-router.post("/chat/completions", llmRateLimiter, chatCompletionsHandler);
 
 /**
  * GET /v1/usage
@@ -327,6 +325,7 @@ router.get(
       description: info.description,
       max_tokens: info.maxTokens,
       supports_streaming: info.supportsStreaming,
+      api_type: info.apiType,
     }));
 
     res.json({ models });

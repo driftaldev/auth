@@ -183,10 +183,6 @@ async function startServer() {
     app.listen(config.port, () => {
       logger.info(`✓ Server running on port ${config.port}`);
       logger.info(`✓ Environment: ${config.nodeEnv}`);
-      logger.info(`✓ Health check: http://localhost:${config.port}/health`);
-      logger.info(`✓ Web auth page: http://localhost:${config.port}/cli/auth`);
-      logger.info("");
-      logger.info("🚀 driftal Backend is ready!");
     });
   } catch (error) {
     logger.error("Failed to start server", { error });
