@@ -391,7 +391,7 @@ export interface HealthCheckResponse {
   version?: string;
 }
 
-export type LLMProvider = "openai" | "openrouter" | "anthropic" | "gemini";
+export type LLMProvider = "openai" | "anthropic" | "google";
 
 export type LLMApiType = "chat_completions" | "responses";
 
@@ -453,17 +453,17 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     description: "O3 reasoning model",
     apiType: "responses",
   },
-  "google/gemini-3-pro-preview": {
+  "gemini-3-pro-preview": {
     name: "Gemini 3 Pro Preview",
-    provider: "openrouter",
+    provider: "google",
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Gemini 3 Pro preview model",
     apiType: "chat_completions",
   },
-  "anthropic/claude-sonnet-4.5": {
+  "claude-sonnet-4.5": {
     name: "Claude Sonnet 4.5",
-    provider: "openrouter",
+    provider: "anthropic",
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Claude Sonnet 4.5 via OpenRouter",
