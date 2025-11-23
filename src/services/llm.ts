@@ -90,9 +90,9 @@ function transformToResponsesAPI(request: ChatCompletionRequest) {
 
   return {
     input,
-    ...(request.temperature !== undefined && {
-      temperature: request.temperature,
-    }),
+    // ...(request.temperature !== undefined && {
+    //   temperature: request.temperature,
+    // }),
     ...(request.max_tokens && {
       max_output_tokens: request.max_tokens,
     }),
@@ -102,7 +102,7 @@ function transformToResponsesAPI(request: ChatCompletionRequest) {
     ...(request.stop && { stop: request.stop }),
     // Add default reasoning config for reasoning models
     reasoning: {
-      type: "medium" as const,
+      effort: "medium" as const,
     },
   };
 }
@@ -216,9 +216,9 @@ export async function makeLLMRequest(
       const chatResponse = await client.chat.completions.create({
         model: apiModel,
         messages: request.messages,
-        ...(request.temperature !== undefined && {
-          temperature: request.temperature,
-        }),
+        // ...(request.temperature !== undefined && {
+        //   temperature: request.temperature,
+        // }),
         ...(request.max_tokens && {
           max_tokens: request.max_tokens,
         }),
@@ -342,9 +342,9 @@ export async function* makeLLMStreamRequest(
       const stream = await client.chat.completions.create({
         model: apiModel,
         messages: request.messages,
-        ...(request.temperature !== undefined && {
-          temperature: request.temperature,
-        }),
+        // ...(request.temperature !== undefined && {
+        //   temperature: request.temperature,
+        // }),
         ...(request.max_tokens && {
           max_tokens: request.max_tokens,
         }),
