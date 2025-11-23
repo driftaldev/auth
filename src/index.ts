@@ -94,7 +94,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(requestLogger);
 
 // Request timeout
-app.use(requestTimeout(30000)); // 30 seconds
+app.use(requestTimeout(300000)); // 5 minutes
 
 // Global rate limiting
 app.use(globalRateLimiter);

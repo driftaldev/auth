@@ -206,7 +206,8 @@ export async function makeLLMRequest(
         ...responsesRequest,
       } as any);
 
-      // Transform response back to chat completions format
+      logger.info("Raw response of responses api", rawResponse);
+
       response = transformFromResponsesAPI(rawResponse, model);
     } else {
       // Use Chat Completions API for standard models
@@ -322,6 +323,8 @@ export async function* makeLLMStreamRequest(
         ...responsesRequest,
         stream: true,
       } as any);
+
+      logger.info("this is the stream of responses api", stream);
 
       // Stream chunks to client, transforming to chat completion format
       for await (const chunk of stream as any) {

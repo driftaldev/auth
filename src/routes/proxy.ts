@@ -35,12 +35,12 @@ const chatCompletionsHandler = asyncHandler(
     validateChatCompletionRequest(req.body);
 
     const chatRequest = req.body;
-    const isStreaming = chatRequest.stream === true;
+    const isStreaming = false; //hard disable streaming for now
 
     logger.info("Chat completion request", {
       userId,
       model: chatRequest.model || "default",
-      streaming: isStreaming,
+      streaming: false, //TODO: later just remove the entire streaming configs
       messageCount: chatRequest.messages.length,
     });
 
