@@ -1,10 +1,10 @@
 // Rate limiting middleware using Upstash Redis
 
-import { Request, Response, NextFunction } from 'express';
-import { Redis } from '@upstash/redis';
-import { config } from '../config/index.js';
-import { RateLimitError } from '../types/index.js';
-import { logger } from '../config/logger.js';
+import { Request, Response, NextFunction } from "express";
+import { Redis } from "@upstash/redis";
+import { config } from "../config/index.js";
+import { RateLimitError } from "../types/index.js";
+import { logger } from "../config/logger.js";
 
 // Initialize Upstash Redis client
 let redis: Redis | null = null;
@@ -15,7 +15,7 @@ function getRedisClient(): Redis {
       url: config.redisUrl,
       token: config.redisToken,
     });
-    logger.info('Upstash Redis client initialized');
+    logger.info("Upstash Redis client initialized");
   }
   return redis;
 }
@@ -37,18 +37,22 @@ export function rateLimiter(options: RateLimitOptions = {}) {
   const {
     windowMs = config.rateLimitWindowMs,
     maxRequests = config.rateLimitMaxRequests,
-    keyPrefix = 'ratelimit',
+    keyPrefix = "ratelimit",
     skipSuccessfulRequests = false,
     skipFailedRequests = false,
     handler,
   } = options;
 
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const redis = getRedisClient();
 
       // Get user identifier (userId if authenticated, IP if not)
-      const identifier = req.userId || req.ip || 'anonymous';
+      const identifier = req.userId || req.ip || "anonymous";
       const key = `${keyPrefix}:${identifier}`;
 
       // Get current count
@@ -59,27 +63,36 @@ export function rateLimiter(options: RateLimitOptions = {}) {
       if (count >= maxRequests) {
         // Get TTL to calculate retry-after
         const ttl = await redis.ttl(key);
-        const retryAfter = Math.ceil(ttl / 1000); // Convert to seconds
 
-        logger.warn('Rate limit exceeded', {
-          identifier,
-          count,
-          maxRequests,
-          retryAfter,
-        });
+        // Only block if key has a valid TTL (not stuck)
+        if (ttl !== -1) {
+          const retryAfter = Math.ceil(ttl / 1000); // Convert to seconds
 
-        if (handler) {
-          handler(req, res);
-        } else {
-          res.status(429).json({
-            error: 'Too many requests',
-            code: 'RATE_LIMIT_ERROR',
+          logger.warn("Rate limit exceeded", {
+            identifier,
+            count,
+            maxRequests,
             retryAfter,
-            limit: maxRequests,
-            window: windowMs / 1000, // Convert to seconds
           });
+
+          if (handler) {
+            handler(req, res);
+          } else {
+            res.status(429).json({
+              error: "Too many requests",
+              code: "RATE_LIMIT_ERROR",
+              retryAfter,
+              limit: maxRequests,
+              window: windowMs / 1000, // Convert to seconds
+            });
+          }
+          return;
         }
-        return;
+
+        // If we are here, ttl === -1 (stuck key)
+        logger.warn("Rate limit key stuck without expiry, resetting", { key });
+        await redis.del(key);
+        // Fall through to increment logic
       }
 
       // Increment counter
@@ -91,9 +104,12 @@ export function rateLimiter(options: RateLimitOptions = {}) {
       }
 
       // Add rate limit headers
-      res.setHeader('X-RateLimit-Limit', maxRequests);
-      res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - newCount));
-      res.setHeader('X-RateLimit-Reset', Date.now() + windowMs);
+      res.setHeader("X-RateLimit-Limit", maxRequests);
+      res.setHeader(
+        "X-RateLimit-Remaining",
+        Math.max(0, maxRequests - newCount)
+      );
+      res.setHeader("X-RateLimit-Reset", Date.now() + windowMs);
 
       // Store original send function
       if (!skipSuccessfulRequests || !skipFailedRequests) {
@@ -106,7 +122,7 @@ export function rateLimiter(options: RateLimitOptions = {}) {
 
           if (shouldSkip) {
             redis.decr(key).catch((err) => {
-              logger.error('Failed to decrement rate limit counter', { err });
+              logger.error("Failed to decrement rate limit counter", { err });
             });
           }
 
@@ -116,7 +132,7 @@ export function rateLimiter(options: RateLimitOptions = {}) {
 
       next();
     } catch (error) {
-      logger.error('Rate limit middleware error', { error });
+      logger.error("Rate limit middleware error", { error });
       // Don't block requests if rate limiting fails
       next();
     }
@@ -129,7 +145,7 @@ export function rateLimiter(options: RateLimitOptions = {}) {
 export const strictRateLimiter = rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 5, // 5 requests per 15 minutes
-  keyPrefix: 'ratelimit:strict',
+  keyPrefix: "ratelimit:strict",
 });
 
 /**
@@ -138,7 +154,7 @@ export const strictRateLimiter = rateLimiter({
 export const apiRateLimiter = rateLimiter({
   windowMs: config.rateLimitWindowMs,
   maxRequests: config.rateLimitMaxRequests,
-  keyPrefix: 'ratelimit:api',
+  keyPrefix: "ratelimit:api",
 });
 
 /**
@@ -147,7 +163,7 @@ export const apiRateLimiter = rateLimiter({
 export const llmRateLimiter = rateLimiter({
   windowMs: 60 * 1000, // 1 minute
   maxRequests: 30, // 30 requests per minute
-  keyPrefix: 'ratelimit:llm',
+  keyPrefix: "ratelimit:llm",
   skipFailedRequests: true, // Don't count failed requests
 });
 
@@ -157,7 +173,7 @@ export const llmRateLimiter = rateLimiter({
 export const globalRateLimiter = rateLimiter({
   windowMs: 60 * 1000, // 1 minute
   maxRequests: 100, // 100 requests per minute per IP
-  keyPrefix: 'ratelimit:global',
+  keyPrefix: "ratelimit:global",
 });
 
 /**
@@ -167,10 +183,10 @@ export async function verifyRedisConnection(): Promise<boolean> {
   try {
     const redis = getRedisClient();
     await redis.ping();
-    logger.info('Redis connection verified');
+    logger.info("Redis connection verified");
     return true;
   } catch (error) {
-    logger.error('Redis connection verification failed', { error });
+    logger.error("Redis connection verification failed", { error });
     return false;
   }
 }

@@ -82,7 +82,7 @@ const chatCompletionsHandler = asyncHandler(
 /**
  * POST /v1/chat/completions
  * POST /chat/completions (alias for compatibility with Mastra/Vercel AI SDK)
- * Proxy LLM requests to Anthropic or OpenAI based on user's selected model
+ * Proxy LLM requests to any supported provider via unified OpenAI SDK interface
  *
  * Headers:
  *   Authorization: Bearer <access_token>

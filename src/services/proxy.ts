@@ -2,19 +2,7 @@
 // Uses Prisma ORM for database operations
 
 import { prisma } from "./prisma.js";
-import {
-  makeAnthropicRequest,
-  makeAnthropicStreamRequest,
-} from "./anthropic.js";
-import { makeOpenAIRequest, makeOpenAIStreamRequest } from "./openai.js";
-import {
-  makeGeminiRequest,
-  makeGeminiStreamRequest,
-} from "./gemini.js";
-import {
-  makeOpenRouterRequest,
-  makeOpenRouterStreamRequest,
-} from "./openrouter.js";
+import { makeLLMRequest, makeLLMStreamRequest } from "./llm.js";
 import { logger } from "../config/logger.js";
 import {
   ChatCompletionRequest,
@@ -25,19 +13,6 @@ import {
   ValidationError,
   NotFoundError,
 } from "../types/index.js";
-
-function mapToActualModelName(modelId: string, provider: LLMProvider): string {
-  const modelMappings: Record<string, string> = {
-    "gpt-5.1": "gpt-5",
-    "gpt-5.1-codex": "gpt-5-codex",
-    "gpt-5-codex": "gpt-5-codex",
-    "o4-mini": "o4-mini",
-    "gpt-5.1-codex-mini": "gpt-5-mini",
-    o3: "o3",
-  };
-
-  return modelMappings[modelId] || modelId;
-}
 
 /**
  * Get provider for a given model
@@ -71,14 +46,13 @@ export async function getUserModel(userId: string): Promise<string> {
 
 /**
  * Route LLM request to appropriate provider
+ * Now uses unified LLM service with OpenAI SDK for all providers
  */
 export async function routeLLMRequest(
   request: ChatCompletionRequest,
   userId: string
 ): Promise<ChatCompletionResponse> {
   const startTime = Date.now();
-
-  console.log("Route LLM Request", request);
 
   try {
     // Determine which model to use
@@ -99,31 +73,14 @@ export async function routeLLMRequest(
 
     const provider = getProviderForModel(model);
 
-    // Map custom model ID to actual API model name
-    const actualModelName = mapToActualModelName(model, provider);
-
     logger.info("Routing LLM request", {
       model,
-      actualModelName,
       provider,
       userId,
     });
 
-    // Route to appropriate provider
-    let response: ChatCompletionResponse;
-
-    if (provider === "anthropic") {
-      response = await makeAnthropicRequest(request, actualModelName, userId);
-    } else if (provider === "openai") {
-      console.log("Making OpenAI request", request);
-      response = await makeOpenAIRequest(request, actualModelName, userId);
-    } else if (provider === "gemini") {
-      response = await makeGeminiRequest(request, actualModelName, userId);
-    } else if (provider === "openrouter") {
-      response = await makeOpenRouterRequest(request, actualModelName, userId);
-    } else {
-      throw new Error(`Unsupported provider: ${provider}`);
-    }
+    // Use unified LLM service (handles all providers via OpenAI SDK)
+    const response = await makeLLMRequest(request, model, userId);
 
     const duration = Date.now() - startTime;
 
@@ -158,6 +115,7 @@ export async function routeLLMRequest(
 
 /**
  * Route streaming LLM request to appropriate provider
+ * Now uses unified LLM service with OpenAI SDK for all providers
  */
 export async function* routeLLMStreamRequest(
   request: ChatCompletionRequest,
@@ -185,33 +143,19 @@ export async function* routeLLMStreamRequest(
 
     provider = getProviderForModel(model);
 
-    // Map custom model ID to actual API model name
-    const actualModelName = mapToActualModelName(model, provider);
-
     logger.info("Routing streaming LLM request", {
       model,
-      actualModelName,
       provider,
       userId,
     });
 
-    // Route to appropriate provider
-    if (provider === "anthropic") {
-      yield* makeAnthropicStreamRequest(request, actualModelName, userId);
-    } else if (provider === "openai") {
-      yield* makeOpenAIStreamRequest(request, actualModelName, userId);
-    } else if (provider === "gemini") {
-      yield* makeGeminiStreamRequest(request, actualModelName, userId);
-    } else if (provider === "openrouter") {
-      yield* makeOpenRouterStreamRequest(request, actualModelName, userId);
-    } else {
-      throw new Error(`Unsupported provider: ${provider}`);
-    }
+    // Use unified LLM service (handles all providers via OpenAI SDK)
+    yield* makeLLMStreamRequest(request, model, userId);
 
     const duration = Date.now() - startTime;
 
     // Log successful streaming request
-    // Note: Token usage is logged within the provider-specific functions
+    // Note: Token usage is logged within the unified LLM service
     await logUsage(userId, model, provider, null, duration, "success");
   } catch (error) {
     const duration = Date.now() - startTime;

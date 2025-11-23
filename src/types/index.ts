@@ -391,11 +391,8 @@ export interface HealthCheckResponse {
   version?: string;
 }
 
-// ============================================================================
-// Model Mapping Types
-// ============================================================================
 
-export type LLMProvider = "openai" | "anthropic" | "gemini" | "openrouter";
+export type LLMProvider = "openai" | "openrouter" | "anthropic" | "gemini";
 
 export interface ModelInfo {
   name: string;
@@ -449,20 +446,19 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     supportsStreaming: true,
     description: "O3 reasoning model",
   },
-  // Google Gemini models
-  "gemini-3-pro-preview": {
+  // Models via OpenRouter (Gemini, Anthropic, etc.)
+  "google/gemini-3-pro-preview": {
     name: "Gemini 3 Pro Preview",
-    provider: "gemini",
+    provider: "openrouter",
     maxTokens: 8192,
     supportsStreaming: true,
     description: "Gemini 3 Pro preview model",
   },
-  // OpenRouter models
   "anthropic/claude-sonnet-4.5": {
     name: "Claude Sonnet 4.5",
     provider: "openrouter",
     maxTokens: 8192,
     supportsStreaming: true,
-    description: "Claude Sonnet 4.5",
+    description: "Claude Sonnet 4.5 via OpenRouter",
   },
 };
