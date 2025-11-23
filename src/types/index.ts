@@ -402,6 +402,7 @@ export interface ModelInfo {
   supportsStreaming: boolean;
   description: string;
   apiType: LLMApiType;
+  openRouterId?: string;
 }
 
 export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
@@ -468,5 +469,6 @@ export const SUPPORTED_MODELS: Record<string, ModelInfo> = {
     supportsStreaming: true,
     description: "Claude Sonnet 4.5 via OpenRouter",
     apiType: "chat_completions",
+    openRouterId: "anthropic/claude-3.5-sonnet",
   },
 };

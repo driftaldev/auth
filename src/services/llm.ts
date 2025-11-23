@@ -46,7 +46,7 @@ function getClientAndModel(modelId: string): {
   client: OpenAI;
   apiModel: string;
   provider: LLMProvider;
-  modelInfo: typeof SUPPORTED_MODELS[string];
+  modelInfo: (typeof SUPPORTED_MODELS)[string];
 } {
   const modelInfo = SUPPORTED_MODELS[modelId];
   if (!modelInfo) {
@@ -56,17 +56,13 @@ function getClientAndModel(modelId: string): {
   const clients = getClients();
   const provider = modelInfo.provider;
 
-  const apiModel = modelId;
+  const apiModel = modelInfo.openRouterId || modelId;
 
   // Map provider to client
   let client: OpenAI;
   if (provider === "openai") {
     client = clients.openai;
-  } else if (
-    provider === "openrouter" ||
-    provider === "gemini" ||
-    provider === "anthropic"
-  ) {
+  } else if (provider === "google" || provider === "anthropic") {
     // Route all non-OpenAI providers through OpenRouter
     client = clients.openrouter;
   } else {
@@ -144,7 +140,10 @@ function transformFromResponsesAPI(
 /**
  * Transform OpenAI Responses API stream chunk to ChatCompletionChunk format
  */
-function transformResponsesStreamChunk(chunk: any, modelId: string): ChatCompletionChunk {
+function transformResponsesStreamChunk(
+  chunk: any,
+  modelId: string
+): ChatCompletionChunk {
   // Handle different chunk formats from Responses API
   const content = chunk.delta?.content || chunk.content || "";
 
@@ -337,7 +336,9 @@ export async function* makeLLMStreamRequest(
       }
     } else {
       // Use Chat Completions API for standard models
-      logger.debug("Using Chat Completions API (streaming)", { model: apiModel });
+      logger.debug("Using Chat Completions API (streaming)", {
+        model: apiModel,
+      });
 
       const stream = await client.chat.completions.create({
         model: apiModel,
