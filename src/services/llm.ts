@@ -72,6 +72,15 @@ function getClientAndModel(modelId: string): {
   return { client, apiModel, provider, modelInfo };
 }
 
+function sanitizeTools(tools: any[] | undefined): any[] | undefined {
+  if (!tools || !Array.isArray(tools)) return undefined;
+
+  return tools.map((tool) => {
+    tool.function.type = "function";
+    return tool.function;
+  });
+}
+
 /**
  * Transform ChatCompletionRequest to OpenAI Responses API format
  */
@@ -96,6 +105,8 @@ function transformToResponsesAPI(request: ChatCompletionRequest) {
       top_p: request.top_p,
     }),
     ...(request.stop && { stop: request.stop }),
+    ...(request.tools && { tools: request.tools }),
+    ...(request.tool_choice && { tool_choice: request.tool_choice }),
     // Add default reasoning config for reasoning models
     reasoning: {
       effort: "medium" as const,
@@ -180,6 +191,11 @@ export async function makeLLMRequest(
   try {
     logger.debug("makeLLMRequest called", { model, userId });
 
+    // Sanitize tools if present
+    if (request.tools) {
+      request.tools = sanitizeTools(request.tools);
+    }
+
     const { client, apiModel, provider, modelInfo } = getClientAndModel(model);
 
     logger.debug("Making LLM API request", {
@@ -232,6 +248,8 @@ export async function makeLLMRequest(
           presence_penalty: request.presence_penalty,
         }),
         ...(request.stop && { stop: request.stop }),
+        ...(request.tools && { tools: request.tools }),
+        ...(request.tool_choice && { tool_choice: request.tool_choice }),
         stream: false,
       });
 
@@ -299,6 +317,11 @@ export async function* makeLLMStreamRequest(
   try {
     logger.debug("makeLLMStreamRequest called", { model, userId });
 
+    // Sanitize tools if present
+    if (request.tools) {
+      request.tools = sanitizeTools(request.tools);
+    }
+
     const { client, apiModel, provider, modelInfo } = getClientAndModel(model);
 
     logger.debug("Making LLM streaming API request", {
@@ -362,6 +385,8 @@ export async function* makeLLMStreamRequest(
           presence_penalty: request.presence_penalty,
         }),
         ...(request.stop && { stop: request.stop }),
+        ...(request.tools && { tools: request.tools }),
+        ...(request.tool_choice && { tool_choice: request.tool_choice }),
         stream: true,
         stream_options: { include_usage: true },
       });

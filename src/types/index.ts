@@ -130,6 +130,8 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number;
   presence_penalty?: number;
   stop?: string | string[];
+  tools?: any[];
+  tool_choice?: any;
 }
 
 export interface ChatCompletionChoice {
