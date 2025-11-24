@@ -76,8 +76,31 @@ function sanitizeTools(tools: any[] | undefined): any[] | undefined {
   if (!tools || !Array.isArray(tools)) return undefined;
 
   return tools.map((tool) => {
+    logger.info("this is the tool", tool);
+    if (
+      tool.type === "function" &&
+      tool.function &&
+      !tool.function.name &&
+      tool.id
+    ) {
+      tool.function.name = tool.id;
+      return tool;
+    }
+
+    if (!tool.type && tool.id) {
+      return {
+        function: {
+          type: "function",
+          name: tool.id,
+          description: tool.description,
+          parameters: tool.parameters || tool.inputSchema || {},
+        },
+      };
+    }
+
     tool.function.type = "function";
-    return tool.function;
+    logger.info("this is the sanitized tool", tool.function);
+    return tool;
   });
 }
 
