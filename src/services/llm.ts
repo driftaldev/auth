@@ -71,35 +71,60 @@ function getClientAndModel(modelId: string): {
 
   return { client, apiModel, provider, modelInfo };
 }
-
 function sanitizeTools(tools: any[] | undefined): any[] | undefined {
-  if (!tools || !Array.isArray(tools)) return undefined;
+  if (!tools || !Array.isArray(tools)) {
+    logger.debug("No tools to sanitize");
+    return undefined;
+  }
 
-  return tools.map((tool) => {
-    logger.info("this is the tool", tool);
+  return tools.map((tool, index) => {
+    logger.debug(`Processing tool ${index}:`, tool);
+
     if (
       tool.type === "function" &&
       tool.function &&
-      !tool.function.name &&
-      tool.id
+      tool.function.name &&
+      tool.name
     ) {
-      tool.function.name = tool.id;
+      logger.debug(`Tool ${index} already properly formatted`);
       return tool;
     }
 
-    if (!tool.type && tool.id) {
-      return {
-        function: {
-          type: "function",
-          name: tool.id,
-          description: tool.description,
-          parameters: tool.parameters || tool.inputSchema || {},
-        },
-      };
+    let toolName = tool.name || tool.function?.name || tool.id;
+
+    if (!toolName) {
+      toolName = `tool_${index}`;
+      logger.warn(
+        `Tool at index ${index} has no identifiable name, using fallback: ${toolName}`
+      );
     }
 
-    tool.function.type = "function";
-    logger.info("this is the sanitized tool", tool.function);
+    if (!tool.function) {
+      tool.function = {
+        name: toolName,
+        description: tool.description || "",
+        parameters: tool.parameters || tool.inputSchema || {},
+        type: "function",
+      };
+      logger.debug(`Created function object for tool ${toolName}`);
+    }
+
+    if (!tool.function.name) {
+      tool.function.name = toolName;
+    }
+    if (!tool.function.type) {
+      tool.function.type = "function";
+    }
+
+    tool.type = "function";
+    tool.name = toolName;
+
+    logger.debug("Sanitized tool", {
+      name: toolName,
+      hasFunction: !!tool.function,
+      hasParameters: !!tool.function.parameters,
+      sanitized: tool,
+    });
     return tool;
   });
 }
