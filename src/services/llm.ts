@@ -170,13 +170,44 @@ function transformFromResponsesAPI(
   modelId: string
 ): ChatCompletionResponse {
   // Extract the text content from output
-  const outputText =
-    response.output_text || response.output?.[0]?.content || "";
+  // The Responses API returns output as an array with different types (reasoning, message, etc.)
+  // We need to find the message type with actual content
+  let outputText = "";
+
+  if (response.output_text) {
+    // Direct output_text field
+    outputText = response.output_text;
+  } else if (response.output && Array.isArray(response.output)) {
+    // Find message type in output array
+    const messageOutput = response.output.find(
+      (item: any) => item.type === "message"
+    );
+    if (messageOutput?.content && Array.isArray(messageOutput.content)) {
+      // Extract text from content array
+      const textContent = messageOutput.content.find(
+        (c: any) => c.type === "output_text"
+      );
+      outputText = textContent?.text || "";
+    }
+  }
+
+  // Transform usage to match Chat Completions format
+  const usage = response.usage
+    ? {
+        prompt_tokens: response.usage.input_tokens || 0,
+        completion_tokens: response.usage.output_tokens || 0,
+        total_tokens: response.usage.total_tokens || 0,
+      }
+    : {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+      };
 
   return {
     id: response.id || `chatcmpl-${Date.now()}`,
     object: "chat.completion",
-    created: response.created || Math.floor(Date.now() / 1000),
+    created: response.created_at || Math.floor(Date.now() / 1000),
     model: modelId,
     choices: [
       {
@@ -185,14 +216,10 @@ function transformFromResponsesAPI(
           role: "assistant",
           content: outputText,
         },
-        finish_reason: response.finish_reason || "stop",
+        finish_reason: response.status === "completed" ? "stop" : "length",
       },
     ],
-    usage: response.usage || {
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      total_tokens: 0,
-    },
+    usage,
   };
 }
 
@@ -202,9 +229,34 @@ function transformFromResponsesAPI(
 function transformResponsesStreamChunk(
   chunk: any,
   modelId: string
-): ChatCompletionChunk {
-  // Handle different chunk formats from Responses API
-  const content = chunk.delta?.content || chunk.content || "";
+): ChatCompletionChunk | null {
+  // Responses API streams events, not just deltas
+  // We need to extract content from different event types
+
+  let content = "";
+  let finishReason = null;
+  let role: "assistant" | undefined = undefined;
+
+  // Handle response.output_text.delta events
+  if (chunk.type === "response.output_text.delta" && chunk.delta) {
+    content = chunk.delta;
+  }
+  // Handle content_block_delta events
+  else if (chunk.type === "content_block_delta" && chunk.delta?.text) {
+    content = chunk.delta.text;
+  }
+  // Handle message_delta events
+  else if (chunk.type === "message_delta" && chunk.delta?.content) {
+    content = chunk.delta.content;
+  }
+  // Handle response.done events
+  else if (chunk.type === "response.done" || chunk.event === "done") {
+    finishReason = "stop";
+  }
+  // Skip other event types (reasoning, etc.)
+  else {
+    return null;
+  }
 
   return {
     id: chunk.id || `chatcmpl-${Date.now()}`,
@@ -215,10 +267,10 @@ function transformResponsesStreamChunk(
       {
         index: 0,
         delta: {
-          role: chunk.delta?.role || undefined,
-          content: content,
+          role,
+          content,
         },
-        finish_reason: chunk.finish_reason || null,
+        finish_reason: finishReason,
       },
     ],
   };
@@ -241,7 +293,8 @@ export async function makeLLMRequest(
 
     // Sanitize tools if present
     if (request.tools) {
-      request.tools = sanitizeTools(request.tools);
+      // request.tools = sanitizeTools(request.tools);
+      request.tools = []; //disable tools for now
     }
 
     const { client, apiModel, provider, modelInfo } = getClientAndModel(model);
@@ -273,6 +326,14 @@ export async function makeLLMRequest(
       logger.info("Raw response of responses api", rawResponse);
 
       response = transformFromResponsesAPI(rawResponse, model);
+
+      logger.info("Transformed response", {
+        hasChoices: !!response.choices,
+        choicesLength: response.choices?.length,
+        contentLength: response.choices?.[0]?.message?.content?.length,
+        contentPreview: response.choices?.[0]?.message?.content?.substring(0, 100),
+        usage: response.usage,
+      });
     } else {
       // Use Chat Completions API for standard models
       logger.debug("Using Chat Completions API", { model: apiModel });
@@ -367,7 +428,8 @@ export async function* makeLLMStreamRequest(
 
     // Sanitize tools if present
     if (request.tools) {
-      request.tools = sanitizeTools(request.tools);
+      // request.tools = sanitizeTools(request.tools);
+      request.tools = []; //disable tools for now
     }
 
     const { client, apiModel, provider, modelInfo } = getClientAndModel(model);
@@ -395,19 +457,38 @@ export async function* makeLLMStreamRequest(
         stream: true,
       } as any);
 
-      logger.info("this is the stream of responses api", stream);
+      logger.info("Responses API stream created, starting to process events");
 
       // Stream chunks to client, transforming to chat completion format
+      let eventCount = 0;
       for await (const chunk of stream as any) {
+        eventCount++;
+        logger.debug(`Responses API event ${eventCount}`, {
+          type: chunk.type,
+          event: chunk.event,
+          hasDelta: !!chunk.delta,
+          hasUsage: !!chunk.usage,
+        });
+
         // Track token usage if available
         if (chunk.usage) {
           totalTokens = chunk.usage.total_tokens;
         }
 
-        // Transform and yield chunk
+        // Transform and yield chunk (skip null chunks like reasoning events)
         const transformedChunk = transformResponsesStreamChunk(chunk, model);
-        yield transformedChunk;
+        if (transformedChunk) {
+          logger.debug(`Transformed chunk ${eventCount}`, {
+            contentLength: transformedChunk.choices?.[0]?.delta?.content?.length,
+            finishReason: transformedChunk.choices?.[0]?.finish_reason,
+          });
+          yield transformedChunk;
+        } else {
+          logger.debug(`Skipped event ${eventCount} (null transformation)`);
+        }
       }
+
+      logger.info(`Responses API stream complete: ${eventCount} events processed`);
     } else {
       // Use Chat Completions API for standard models
       logger.debug("Using Chat Completions API (streaming)", {

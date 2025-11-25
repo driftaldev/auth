@@ -35,34 +35,47 @@ const chatCompletionsHandler = asyncHandler(
     validateChatCompletionRequest(req.body);
 
     const chatRequest = req.body;
-    const isStreaming = false; //hard disable streaming for now
+    const isStreaming = chatRequest.stream === true;
 
     logger.info("Chat completion request", {
       userId,
       model: chatRequest.model || "default",
-      streaming: false, //TODO: later just remove the entire streaming configs
+      streaming: isStreaming,
       messageCount: chatRequest.messages.length,
     });
 
     if (isStreaming) {
-      // Handle streaming response with Server-Sent Events
+      // Handle streaming response - OpenAI format (SSE with data: prefix)
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
       res.flushHeaders();
 
       try {
         const stream = routeLLMStreamRequest(chatRequest, userId);
 
+        let chunkCount = 0;
         for await (const chunk of stream) {
-          // Send chunk as SSE data
+          chunkCount++;
+          logger.debug(`Streaming chunk ${chunkCount}`, {
+            hasChoices: !!chunk.choices,
+            hasDelta: !!chunk.choices?.[0]?.delta,
+            deltaContent: chunk.choices?.[0]?.delta?.content?.substring(0, 50),
+            finishReason: chunk.choices?.[0]?.finish_reason,
+          });
+
+          // OpenAI streaming format: data: {json}\n\n
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
         }
+
+        logger.info(`Streaming complete: ${chunkCount} chunks sent`);
 
         // Send done signal
         res.write("data: [DONE]\n\n");
         res.end();
       } catch (error) {
+        logger.error("Streaming error", { error, userId });
         // Send error as SSE
         res.write(
           `data: ${JSON.stringify({
