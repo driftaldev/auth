@@ -169,6 +169,7 @@ export interface ChatCompletionChunk {
     delta: {
       role?: "assistant";
       content?: string;
+      reasoning?: string; // Reasoning/thinking content from reasoning models
     };
     finish_reason: "stop" | "length" | "content_filter" | null;
   }>;

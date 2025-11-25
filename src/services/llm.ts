@@ -234,10 +234,11 @@ function transformResponsesStreamChunk(
   // We need to extract content from different event types
 
   let content = "";
+  let reasoning = "";
   let finishReason = null;
   let role: "assistant" | undefined = undefined;
 
-  // Handle response.output_text.delta events
+  // Handle response.output_text.delta events (regular text output)
   if (chunk.type === "response.output_text.delta" && chunk.delta) {
     content = chunk.delta;
   }
@@ -249,12 +250,32 @@ function transformResponsesStreamChunk(
   else if (chunk.type === "message_delta" && chunk.delta?.content) {
     content = chunk.delta.content;
   }
+  // Handle reasoning/thinking events from reasoning models (o1, o3, etc.)
+  else if (
+    chunk.type === "response.reasoning.delta" ||
+    chunk.type === "response.reasoning_summary.delta" ||
+    chunk.type === "reasoning.delta" ||
+    chunk.type === "reasoning" ||
+    chunk.type === "response.thinking.delta" ||
+    chunk.type === "thinking.delta"
+  ) {
+    reasoning = chunk.delta || chunk.text || chunk.content || "";
+    logger.debug("Captured reasoning chunk", {
+      type: chunk.type,
+      reasoningLength: reasoning.length,
+    });
+  }
   // Handle response.done events
   else if (chunk.type === "response.done" || chunk.event === "done") {
     finishReason = "stop";
   }
-  // Skip other event types (reasoning, etc.)
+  // Skip truly irrelevant events
   else {
+    return null;
+  }
+
+  // Only return a chunk if we have content, reasoning, or it's a finish event
+  if (!content && !reasoning && !finishReason) {
     return null;
   }
 
@@ -268,7 +289,8 @@ function transformResponsesStreamChunk(
         index: 0,
         delta: {
           role,
-          content,
+          content: content || undefined,
+          reasoning: reasoning || undefined,
         },
         finish_reason: finishReason,
       },
@@ -331,7 +353,10 @@ export async function makeLLMRequest(
         hasChoices: !!response.choices,
         choicesLength: response.choices?.length,
         contentLength: response.choices?.[0]?.message?.content?.length,
-        contentPreview: response.choices?.[0]?.message?.content?.substring(0, 100),
+        contentPreview: response.choices?.[0]?.message?.content?.substring(
+          0,
+          100
+        ),
         usage: response.usage,
       });
     } else {
@@ -479,7 +504,8 @@ export async function* makeLLMStreamRequest(
         const transformedChunk = transformResponsesStreamChunk(chunk, model);
         if (transformedChunk) {
           logger.debug(`Transformed chunk ${eventCount}`, {
-            contentLength: transformedChunk.choices?.[0]?.delta?.content?.length,
+            contentLength:
+              transformedChunk.choices?.[0]?.delta?.content?.length,
             finishReason: transformedChunk.choices?.[0]?.finish_reason,
           });
           yield transformedChunk;
@@ -488,7 +514,9 @@ export async function* makeLLMStreamRequest(
         }
       }
 
-      logger.info(`Responses API stream complete: ${eventCount} events processed`);
+      logger.info(
+        `Responses API stream complete: ${eventCount} events processed`
+      );
     } else {
       // Use Chat Completions API for standard models
       logger.debug("Using Chat Completions API (streaming)", {
