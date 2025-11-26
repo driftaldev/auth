@@ -609,20 +609,18 @@ export async function getUserProfile(userId: string) {
  * DEPRECATED: Model preferences are now stored locally in CLI config (~/.driftal/config.json)
  * This function has been removed as part of schema migration
  */
-const DEFAULT_PRIMARY_MODEL = "claude-3-5-sonnet-20241022";
+const DEFAULT_PREFERRED_MODEL = "gpt-5-codex";
 
 export async function updateUserModelPreferences(
   userId: string,
-  primaryModel?: string,
-  fallbackModel?: string | null
+  preferredModel?: string
 ) {
   // Model preferences now managed client-side in CLI config
   logger.warn(
     "Model preferences endpoint deprecated - preferences now stored in CLI config",
     {
       userId,
-      primaryModel,
-      fallbackModel,
+      preferredModel,
     }
   );
   throw new Error(

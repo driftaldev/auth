@@ -58,8 +58,7 @@ const googleOAuthCallbackSchema = z.object({
 
 const modelPreferencesSchema = z.object({
   body: z.object({
-    primary_model: z.string().optional(),
-    fallback_model: z.string().optional().nullable(),
+    preferred_model: z.string().optional(),
   }),
 });
 
@@ -329,8 +328,7 @@ router.get(
  *   {
  *     user_id: "uuid",
  *     state: "csrf_token",
- *     primary_model: "claude-3-5-sonnet-20241022" (optional),
- *     fallback_model: "gpt-4" (optional)
+ *     preferred_model: "gpt-5-codex" (optional)
  *   }
  *
  * Response:
@@ -342,13 +340,13 @@ router.get(
 router.post(
   '/code',
   asyncHandler(async (req: Request, res: Response) => {
-    const { user_id, state, primary_model, fallback_model } = req.body;
+    const { user_id, state, preferred_model } = req.body;
 
     logger.info('Authorization code generation request', { userId: user_id, state });
 
-    // Update model preferences if provided
-    if (primary_model || fallback_model !== undefined) {
-      await updateUserModelPreferences(user_id, primary_model, fallback_model);
+    // Update model preferences if provided (deprecated - preferences now managed client-side)
+    if (preferred_model) {
+      await updateUserModelPreferences(user_id, preferred_model);
     }
 
     const code = await createAuthorizationCode(user_id, state);
