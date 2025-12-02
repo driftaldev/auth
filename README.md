@@ -1,5 +1,3 @@
-# Auth - Authentication & AI Gateway Service
-
 > Authentication and AI gateway service for the Driftal CLI
 
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
@@ -43,7 +41,6 @@
 - **Integrations**
   - Moss (Semantic Code Search) credentials management
   - Morph (Fast Apply) API key distribution
-
 
 ### Key Components
 
@@ -108,8 +105,6 @@ Create a `.env` file in the root directory:
 cp .env.example .env
 ```
 
-Fill in all required environment variables (see [Configuration](#configuration) section below).
-
 ### 4. Set Up Database
 
 The service uses Supabase PostgreSQL. Apply the database schema:
@@ -130,52 +125,7 @@ npm run dev
 ```
 
 The server will start on `http://localhost:3000` (or the port specified in your `.env` file).
-
-## Configuration
-
-### Environment Variables
-
-| Variable                    | Required | Description                                       | Default                                                               |
-| --------------------------- | -------- | ------------------------------------------------- | --------------------------------------------------------------------- |
-| **Server**                  |
-| `PORT`                      | No       | Server port                                       | `3000`                                                                |
-| `NODE_ENV`                  | No       | Environment (`development`, `production`, `test`) | `development`                                                         |
-| **Supabase**                |
-| `SUPABASE_URL`              | Yes      | Supabase project URL                              | -                                                                     |
-| `SUPABASE_ANON_KEY`         | Yes      | Supabase anonymous key                            | -                                                                     |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes      | Supabase service role key                         | -                                                                     |
-| `SUPABASE_JWT_SECRET`       | Yes      | JWT secret for token verification                 | -                                                                     |
-| **Redis**                   |
-| `REDIS_URL`                 | Yes      | Redis connection URL                              | -                                                                     |
-| `REDIS_TOKEN`               | Yes      | Redis authentication token                        | -                                                                     |
-| **LLM Providers**           |
-| `OPENAI_API_KEY`            | Yes      | OpenAI API key                                    | -                                                                     |
-| `ANTHROPIC_API_KEY`         | Yes      | Anthropic API key                                 | -                                                                     |
-| `GEMINI_API_KEY`            | Yes      | Google Gemini API key                             | -                                                                     |
-| `OPENROUTER_API_KEY`        | Yes      | OpenRouter API key                                | -                                                                     |
-| **Moss**                    |
-| `MOSS_PROJECT_ID`           | Yes      | Moss project identifier                           | -                                                                     |
-| `MOSS_PROJECT_KEY`          | Yes      | Moss project API key                              | -                                                                     |
-| **Morph**                   |
-| `MORPH_API_KEY`             | No       | Morph API key (optional)                          | -                                                                     |
-| **Rate Limiting**           |
-| `RATE_LIMIT_WINDOW_MS`      | No       | Rate limit window in milliseconds                 | `60000`                                                               |
-| `RATE_LIMIT_MAX_REQUESTS`   | No       | Max requests per window                           | `50`                                                                  |
-| **CORS**                    |
-| `ALLOWED_ORIGINS`           | No       | Comma-separated list of allowed origins           | `http://localhost:8080,http://localhost:*,https://auth.driftal.dev:*` |
-| **URLs**                    |
-| `BASE_URL`                  | No       | Base URL of the service                           | `https://auth.driftal.dev`                                            |
-| `FRONTEND_URL`              | No       | Frontend application URL                          | `https://driftal.dev`                                                 |
-| `CLI_CALLBACK_URL_PATTERN`  | No       | CLI callback URL pattern                          | `http://localhost:*`                                                  |
-| **Logging**                 |
-| `LOG_LEVEL`                 | No       | Log level (`error`, `warn`, `info`, `debug`)      | `info`                                                                |
-| `LOG_FILE`                  | No       | Log file path (optional)                          | -                                                                     |
-| **Authentication**          |
-| `AUTH_CODE_EXPIRY_MINUTES`  | No       | Authorization code expiry in minutes              | `10`                                                                  |
-| `JWT_EXPIRY_SECONDS`        | No       | JWT token expiry in seconds                       | `3600`                                                                |
-| **Security**                |
-| `FORCE_HTTPS`               | No       | Force HTTPS redirects                             | `false`                                                               |
-| `TRUST_PROXY`               | No       | Trust proxy headers (for Railway, Render, etc.)   | `false`                                                               |
+|
 
 ### Example `.env` File
 
