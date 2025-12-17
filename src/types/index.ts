@@ -173,6 +173,12 @@ export interface ChatCompletionChunk {
     };
     finish_reason: "stop" | "length" | "content_filter" | null;
   }>;
+  // Usage information (present in final chunk when stream_options.include_usage=true)
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 // ============================================================================

@@ -56,8 +56,17 @@ const chatCompletionsHandler = asyncHandler(
         const stream = routeLLMStreamRequest(chatRequest, userId);
 
         let chunkCount = 0;
+        let finalUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null = null;
+
         for await (const chunk of stream) {
           chunkCount++;
+
+          // Capture usage from any chunk that has it
+          if (chunk.usage) {
+            finalUsage = chunk.usage;
+            logger.info(`✅ Captured usage from chunk ${chunkCount}:`, finalUsage);
+          }
+
           logger.debug(`Streaming chunk ${chunkCount}`, {
             hasChoices: !!chunk.choices,
             hasDelta: !!chunk.choices?.[0]?.delta,
@@ -70,6 +79,18 @@ const chatCompletionsHandler = asyncHandler(
         }
 
         logger.info(`Streaming complete: ${chunkCount} chunks sent`);
+
+        // Send usage as a final event BEFORE [DONE]
+        if (finalUsage) {
+          const usageEvent = {
+            type: "usage",
+            usage: finalUsage,
+          };
+          res.write(`data: ${JSON.stringify(usageEvent)}\n\n`);
+          logger.info("✅ Sent final usage event", finalUsage);
+        } else {
+          logger.warn("⚠️  No usage data captured during streaming - totalTokens will be 0");
+        }
 
         // Send done signal
         res.write("data: [DONE]\n\n");

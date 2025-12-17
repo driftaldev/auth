@@ -228,7 +228,8 @@ function transformFromResponsesAPI(
  */
 function transformResponsesStreamChunk(
   chunk: any,
-  modelId: string
+  modelId: string,
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null
 ): ChatCompletionChunk | null {
   // Responses API streams events, not just deltas
   // We need to extract content from different event types
@@ -265,8 +266,12 @@ function transformResponsesStreamChunk(
       reasoningLength: reasoning.length,
     });
   }
-  // Handle response.done events
-  else if (chunk.type === "response.done" || chunk.event === "done") {
+  // Handle response.done/completed events
+  else if (
+    chunk.type === "response.done" ||
+    chunk.type === "response.completed" ||
+    chunk.event === "done"
+  ) {
     finishReason = "stop";
   }
   // Skip truly irrelevant events
@@ -274,12 +279,12 @@ function transformResponsesStreamChunk(
     return null;
   }
 
-  // Only return a chunk if we have content, reasoning, or it's a finish event
-  if (!content && !reasoning && !finishReason) {
+  // Only return a chunk if we have content, reasoning, finish event, or usage
+  if (!content && !reasoning && !finishReason && !usage) {
     return null;
   }
 
-  return {
+  const transformedChunk: ChatCompletionChunk = {
     id: chunk.id || `chatcmpl-${Date.now()}`,
     object: "chat.completion.chunk",
     created: chunk.created || Math.floor(Date.now() / 1000),
@@ -296,6 +301,13 @@ function transformResponsesStreamChunk(
       },
     ],
   };
+
+  // Include usage if provided (typically only in final chunk)
+  if (usage) {
+    transformedChunk.usage = usage;
+  }
+
+  return transformedChunk;
 }
 
 /**
@@ -485,6 +497,7 @@ export async function* makeLLMStreamRequest(
       logger.info("Responses API stream created, starting to process events");
 
       // Stream chunks to client, transforming to chat completion format
+      let lastResponseObject: any = null;
       let eventCount = 0;
       for await (const chunk of stream as any) {
         eventCount++;
@@ -495,18 +508,54 @@ export async function* makeLLMStreamRequest(
           hasUsage: !!chunk.usage,
         });
 
-        // Track token usage if available
+        // Capture response.completed event
+        if (chunk.type === "response.completed" || chunk.event === "done") {
+          lastResponseObject = chunk;
+          logger.debug("Captured response.completed event", {
+            hasResponse: !!chunk.response,
+            hasUsage: !!chunk.response?.usage,
+          });
+        }
+
+        // Track token usage from event-level usage field (if available)
         if (chunk.usage) {
           totalTokens = chunk.usage.total_tokens;
+          logger.debug("Captured usage from event", { totalTokens });
+        }
+
+        // Extract usage for final chunk
+        let usageToInclude = null;
+        if (
+          (chunk.type === "response.completed" || chunk.event === "done") &&
+          lastResponseObject?.response?.usage
+        ) {
+          usageToInclude = {
+            prompt_tokens:
+              lastResponseObject.response.usage.input_tokens || 0,
+            completion_tokens:
+              lastResponseObject.response.usage.output_tokens || 0,
+            total_tokens:
+              lastResponseObject.response.usage.total_tokens || 0,
+          };
+          totalTokens = usageToInclude.total_tokens;
+          logger.info(
+            "✅ Extracted usage from response.completed",
+            usageToInclude
+          );
         }
 
         // Transform and yield chunk (skip null chunks like reasoning events)
-        const transformedChunk = transformResponsesStreamChunk(chunk, model);
+        const transformedChunk = transformResponsesStreamChunk(
+          chunk,
+          model,
+          usageToInclude
+        );
         if (transformedChunk) {
           logger.debug(`Transformed chunk ${eventCount}`, {
             contentLength:
               transformedChunk.choices?.[0]?.delta?.content?.length,
             finishReason: transformedChunk.choices?.[0]?.finish_reason,
+            hasUsage: !!transformedChunk.usage,
           });
           yield transformedChunk;
         } else {
@@ -515,7 +564,7 @@ export async function* makeLLMStreamRequest(
       }
 
       logger.info(
-        `Responses API stream complete: ${eventCount} events processed`
+        `Responses API stream complete: ${eventCount} events processed, totalTokens: ${totalTokens}`
       );
     } else {
       // Use Chat Completions API for standard models
@@ -551,8 +600,16 @@ export async function* makeLLMStreamRequest(
       // Stream chunks to client
       for await (const chunk of stream) {
         // Track token usage from final chunk
+        logger.info(`✅ [LLM Service] Received chunk:`, {
+          chunk,
+        });
         if (chunk.usage) {
           totalTokens = chunk.usage.total_tokens;
+          logger.info(`✅ [LLM Service] Received usage from OpenAI:`, {
+            prompt_tokens: chunk.usage.prompt_tokens,
+            completion_tokens: chunk.usage.completion_tokens,
+            total_tokens: chunk.usage.total_tokens,
+          });
         }
 
         yield chunk as ChatCompletionChunk;

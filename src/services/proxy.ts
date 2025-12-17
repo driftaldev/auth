@@ -39,7 +39,6 @@ export async function getUserModel(userId: string): Promise<string> {
     "getUserModel called - returning default model (preferences now in CLI config)",
     { userId }
   );
-  // Default to Claude 3.5 Sonnet
   // The CLI should always provide the model explicitly in requests
   return "gpt-5.1";
 }
