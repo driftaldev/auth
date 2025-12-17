@@ -13,7 +13,6 @@ import {
 } from "../services/proxy.js";
 import { logger } from "../config/logger.js";
 import { config } from "../config/index.js";
-import { ChatCompletionChunk } from "../types/index.js";
 
 const router = Router();
 
@@ -56,15 +55,13 @@ const chatCompletionsHandler = asyncHandler(
         const stream = routeLLMStreamRequest(chatRequest, userId);
 
         let chunkCount = 0;
-        let finalUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null = null;
 
         for await (const chunk of stream) {
           chunkCount++;
 
-          // Capture usage from any chunk that has it
+          // Log usage when captured (already in chunk from OpenAI)
           if (chunk.usage) {
-            finalUsage = chunk.usage;
-            logger.info(`✅ Captured usage from chunk ${chunkCount}:`, finalUsage);
+            logger.info(`✅ Captured usage from chunk ${chunkCount}:`, chunk.usage);
           }
 
           logger.debug(`Streaming chunk ${chunkCount}`, {
@@ -79,18 +76,6 @@ const chatCompletionsHandler = asyncHandler(
         }
 
         logger.info(`Streaming complete: ${chunkCount} chunks sent`);
-
-        // Send usage as a final event BEFORE [DONE]
-        if (finalUsage) {
-          const usageEvent = {
-            type: "usage",
-            usage: finalUsage,
-          };
-          res.write(`data: ${JSON.stringify(usageEvent)}\n\n`);
-          logger.info("✅ Sent final usage event", finalUsage);
-        } else {
-          logger.warn("⚠️  No usage data captured during streaming - totalTokens will be 0");
-        }
 
         // Send done signal
         res.write("data: [DONE]\n\n");
